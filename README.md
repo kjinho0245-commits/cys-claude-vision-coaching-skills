@@ -39,6 +39,26 @@ This package is published on GitHub to realize the **Vision Reproduction — the
 
 ## 📢 최근 업데이트 / Recent Updates
 
+**2026-05-17 — 26개 vision 스킬 결정론 모듈·테스트·검증 자료 일괄 추가**
+- 26개 SKILL.md 본문 보강 (총 +3,505줄 / −1,352줄)
+- 스킬별 결정론 엔진·라이브러리·검증 스크립트·테스트 시나리오 신규 추가
+  (career-recommendation·clarity·enneagram·mbti·five-stages·follow-through·
+   four-futures·futures-timeline·goal-reframing·mission-frame·multipleintel·
+   personal-future-research·progress-review·readiness·smart-five·statement·
+   strategy·strong·three-realm·values·financial-3shields·financial-coach·
+   future-needs·future-promise·cys-competence·eight-training 등 전 영역)
+- `.gitignore`에 Python 캐시(`__pycache__`·`*.pyc`) 패턴 추가
+- 변경량: 202 files, +44,864줄 / −1,352줄 (커밋 `710a3f9`)
+- 부수 갱신: `docs/SKILL_CATALOG.md` 자동 빌드 재생성
+
+**2026-05-17 — Deterministic modules·tests·validation assets added to 26 vision skills**
+- 26 SKILL.md bodies enhanced (+3,505 / −1,352 lines in skill docs)
+- Per-skill deterministic engines, libraries, validation scripts, and test
+  scenarios added across all four areas (diagnosis · spine · flesh · prescription)
+- `.gitignore` extended with Python cache patterns (`__pycache__`·`*.pyc`)
+- Diff: 202 files, +44,864 / −1,352 lines (commit `710a3f9`)
+- Side update: `docs/SKILL_CATALOG.md` regenerated via auto-build
+
 **2026-05-13 — 22개 vision 스킬 대규모 품질 보강**
 - 진단·척추·살근육·처방 전 영역 22개 SKILL.md 일괄 업데이트
 - 박사님 책 인용 정밀화 + 코칭 흐름 일관성 강화
