@@ -382,8 +382,7 @@ done
 설치가 끝까지 안 되거나 막히는 부분이 있다면:
 
 - **GitHub Issues**: [github.com/idoforgod/cys-claude-vision-coaching-skills/issues](https://github.com/idoforgod/cys-claude-vision-coaching-skills/issues)
-- **이메일**: ysfuture@gmail.com
-- **박사님 소속**: 아시아미래인재연구소 / 소망과사랑의교회
+- **이메일**: cysinsight@gmail.com
 
 ---
 

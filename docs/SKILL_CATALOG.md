@@ -67,8 +67,7 @@
 ## 📞 연락 / Contact
 
 - **저자**: 최윤식 박사 (Dr. Choi Yoon-Sik)
-- **이메일**: ysfuture@gmail.com
-- **소속**: 아시아미래인재연구소 / 소망과사랑의교회
+- **이메일**: cysinsight@gmail.com
 
 ---
 

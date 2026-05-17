@@ -794,7 +794,7 @@ This package grows *as a community* in the spirit of Dr. Choi's *vision reproduc
 
 This package is licensed under [CC BY-NC-SA 4.0](LICENSE) (NonCommercial-Attribution-ShareAlike).
 
-상업적 활용 문의 / Commercial use inquiry: **ysfuture@gmail.com**
+상업적 활용 문의 / Commercial use inquiry: **cysinsight@gmail.com**
 
 ---
 
