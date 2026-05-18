@@ -370,12 +370,60 @@ def parse_topic(text: Any) -> dict:
 # 3. 박사님 표준 사전 충돌 검출 / lookup
 # ---------------------------------------------------------------------------
 
+# 영문 → 한글 별칭 매핑 (glossary_standard.md 헤더 영문 부제 기준)
+ENGLISH_ALIASES: dict[str, str] = {
+    "Vision": "비전",
+    "Mission": "미션",
+    "Calling": "소명",
+    "Value": "가치",
+    "Era": "시대",
+    "Times": "시대",
+    "Mission Frame": "비전 프레임",
+    "Spiritual Intuition": "영적 직관력",
+    "Divine Inspiration": "영감",
+    "Divine Value": "정신적 가치",
+    "Intellectual Judgment": "이성적 판단력",
+    "Information": "정보",
+    "Forecasting Framework": "예측 구성",
+    "Reinforcing Feedback Loop": "강화 피드백 루프",
+    "Three Realms": "3영역",
+    "Self": "나",
+    "Family & World": "가족과 세상",
+    "Personal Desire": "개인 욕망",
+    "Self-Sacrifice": "자기희생·세상일",
+    "Distorted Mission": "왜곡된 사명",
+    "LDR": "Life Decision Record",
+}
+
+
 def glossary_lookup(term: Any) -> dict:
     if not isinstance(term, str):
         return {"found": False, "term": str(term), "reason": "non-string"}
     t = term.strip()
+    # 1차: 직접 매칭
     if t in STANDARD_GLOSSARY:
-        return {"found": True, "term": t, **STANDARD_GLOSSARY[t]}
+        return {"found": True, "term": t, "matched_via": "direct", **STANDARD_GLOSSARY[t]}
+    # 2차: 영문 별칭 매칭
+    if t in ENGLISH_ALIASES:
+        ko = ENGLISH_ALIASES[t]
+        if ko in STANDARD_GLOSSARY:
+            return {
+                "found": True,
+                "term": ko,
+                "english_input": t,
+                "matched_via": "english_alias",
+                **STANDARD_GLOSSARY[ko],
+            }
+    # 3차: 대소문자 무시 영문 매칭
+    for en, ko in ENGLISH_ALIASES.items():
+        if t.lower() == en.lower() and ko in STANDARD_GLOSSARY:
+            return {
+                "found": True,
+                "term": ko,
+                "english_input": t,
+                "matched_via": "english_alias_ci",
+                **STANDARD_GLOSSARY[ko],
+            }
     return {"found": False, "term": t, "reason": "not in standard glossary"}
 
 
@@ -726,17 +774,24 @@ def three_realm_check(self_realm: Any, others_realm: Any, moral_realm: Any) -> d
 # ---------------------------------------------------------------------------
 
 SCENARIO_TEMPLATES = [
-    {"name": "5년 후 시나리오", "prompt": "이 결정을 따랐을 때 5년 후 본인의 일상 한 장면을 묘사하세요 — 어디서, 누구와, 무엇을 하고 있나요? 4 Skill Balance 5축(생각·언어·감성·몸·영성) 중 어느 축이 가장 충만하고 어느 축이 가장 결핍될 것 같은가요?"},
-    {"name": "10년 후 시나리오", "prompt": "10년 후 본인의 모습 — 비전 정의 '가치 있는 시대적 소명'의 세 자리(가치·시대·소명)가 각각 어떻게 채워져 있을 것 같은가요? 박사님 vision-five-stages로 보면 어느 단계에 도달해 있을까요?"},
-    {"name": "실패 시나리오", "prompt": "이 결정이 *실패*했다고 가정합시다. 3년 안에 실패 신호가 나타난다면 그 신호는 어떤 형태일까요? 박사님 3영역(나·가족과 세상·정신적 가치) 중 어디서 먼저 신호가 올까요?"},
-    {"name": "기회비용 시나리오", "prompt": "이 결정을 *하지 않았을 때* 가능했던 대안 1개를 그려봅시다. 그 대안이 5년 후 본인에게 무엇을 줬을 것 같나요? 박사님 vision-four-futures의 '대안 미래' 관점에서 보세요."},
+    {"name": "5년 후 시나리오", "prompt_template": "{topic}을(를) 따랐을 때 5년 후 본인의 일상 한 장면을 묘사하세요 — 어디서, 누구와, 무엇을 하고 있나요? 4 Skill Balance 5축(생각·언어·감성·몸·영성) 중 어느 축이 가장 충만하고 어느 축이 가장 결핍될 것 같은가요?"},
+    {"name": "10년 후 시나리오", "prompt_template": "10년 후 본인의 모습 — {topic} 결정으로 인해 비전 정의 '가치 있는 시대적 소명'의 세 자리(가치·시대·소명)가 각각 어떻게 채워져 있을 것 같은가요? 박사님 vision-five-stages로 보면 어느 단계에 도달해 있을까요?"},
+    {"name": "실패 시나리오", "prompt_template": "{topic}이(가) *실패*했다고 가정합시다. 3년 안에 실패 신호가 나타난다면 그 신호는 어떤 형태일까요? 박사님 3영역(나·가족과 세상·정신적 가치) 중 어디서 먼저 신호가 올까요?"},
+    {"name": "기회비용 시나리오", "prompt_template": "{topic} 결정을 *하지 않았을 때* 가능했던 대안 1개를 그려봅시다. 그 대안이 5년 후 본인에게 무엇을 줬을 것 같나요? 박사님 vision-four-futures의 '대안 미래' 관점에서 보세요."},
 ]
 
 
 def scenario_expand(topic: Any) -> dict:
     if not isinstance(topic, str):
         topic = ""
-    return {"topic": topic, "scenarios": [dict(s) for s in SCENARIO_TEMPLATES]}
+    t = topic.strip() if topic.strip() else "이 결정"
+    return {
+        "topic": topic,
+        "scenarios": [
+            {"name": s["name"], "prompt": s["prompt_template"].format(topic=t)}
+            for s in SCENARIO_TEMPLATES
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1220,6 +1275,331 @@ def validate_topic_map_skills(skills_root: Any = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 16. 호칭 결정 (select_honorific) — vision 시리즈 일관 패턴
+# ---------------------------------------------------------------------------
+
+HONORIFIC_DEFAULT = "선생님"
+
+
+def select_honorific(meta: Any = None) -> dict:
+    """사용자 메타데이터로 호칭 결정.
+
+    meta 키:
+      - is_doctor: bool       → 박사님 본인이면 "박사님"
+      - title: str            → 명시 직함 ("목사", "전도사", "교수" 등) → "○○님"
+      - name: str             → 이름만 있을 때 "○○님"
+      - default: 기본값 "선생님"
+    """
+    if not isinstance(meta, dict):
+        return {"honorific": HONORIFIC_DEFAULT, "reason": "no meta"}
+    if meta.get("is_doctor") is True:
+        return {"honorific": "박사님", "reason": "is_doctor=True"}
+    title = (meta.get("title") or "").strip() if isinstance(meta.get("title"), str) else ""
+    if title:
+        if title.endswith("님"):
+            return {"honorific": title, "reason": "title with 님"}
+        return {"honorific": f"{title}님", "reason": "title + 님"}
+    name = (meta.get("name") or "").strip() if isinstance(meta.get("name"), str) else ""
+    if name:
+        if name.endswith("님"):
+            return {"honorific": name, "reason": "name with 님"}
+        return {"honorific": f"{name}님", "reason": "name + 님"}
+    return {"honorific": HONORIFIC_DEFAULT, "reason": "default"}
+
+
+# ---------------------------------------------------------------------------
+# 17. LDR 본문 템플릿 생성 (render_ldr_body)
+# ---------------------------------------------------------------------------
+
+VALID_LDR_AREAS = ("진로", "재정", "관계", "사역", "건강", "비전 영역 전환")
+
+
+def render_ldr_body(
+    title: Any,
+    date_iso: Any,
+    area: Any,
+    reason: Any,
+    status: Any = None,
+    options_considered: Any = None,
+    consequences: Any = None,
+) -> dict:
+    """LDR 본문 자동 생성 — 최소 템플릿 + 선택 섹션.
+
+    인자:
+        title: 결정 제목
+        date_iso: 'YYYY-MM-DD' 형식
+        area: 영역 (진로/재정/관계/사역/건강/비전 영역 전환 또는 자유 문자열)
+        reason: 1~3 문장의 'why'
+        status: proposed | accepted | deprecated | superseded by LDR-NNNN (선택)
+        options_considered: 거절한 대안 리스트 (선택)
+        consequences: 후속 영향 리스트 (선택)
+    """
+    if not isinstance(title, str) or not title.strip():
+        return {"ok": False, "reason": "title required"}
+    if not isinstance(date_iso, str) or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_iso.strip()):
+        return {"ok": False, "reason": "date_iso must be YYYY-MM-DD"}
+    if not isinstance(area, str) or not area.strip():
+        return {"ok": False, "reason": "area required"}
+    if not isinstance(reason, str) or not reason.strip():
+        return {"ok": False, "reason": "reason required"}
+
+    lines = [f"# {title.strip()}", "", f"**날짜**: {date_iso.strip()}", f"**영역**: {area.strip()}"]
+    if status and isinstance(status, str) and status.strip():
+        lines.append(f"**Status**: {status.strip()}")
+    lines.append("")
+    lines.append(reason.strip())
+
+    if options_considered and isinstance(options_considered, list) and options_considered:
+        lines.append("")
+        lines.append("## 고려한 대안")
+        for opt in options_considered:
+            if isinstance(opt, str) and opt.strip():
+                lines.append(f"- {opt.strip()}")
+
+    if consequences and isinstance(consequences, list) and consequences:
+        lines.append("")
+        lines.append("## Consequences")
+        for c in consequences:
+            if isinstance(c, str) and c.strip():
+                lines.append(f"- {c.strip()}")
+
+    lines.append("")
+    body = "\n".join(lines)
+    return {
+        "ok": True,
+        "body": body,
+        "title": title.strip(),
+        "date": date_iso.strip(),
+        "area": area.strip(),
+        "is_known_area": area.strip() in VALID_LDR_AREAS,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 18. 박사님 정의 인용 포맷 생성 (render_definition / render_quote)
+# ---------------------------------------------------------------------------
+
+def render_definition(term: Any) -> dict:
+    """glossary_lookup 결과를 인터뷰에서 그대로 쓸 수 있는 한 줄로 포맷.
+
+    출력 예: "**비전**: 가치 있는 시대적 소명 (박사님 『미래준비학교』(2016) — SOURCES.md § A-01)"
+    """
+    lookup = glossary_lookup(term)
+    if not lookup.get("found"):
+        return {"ok": False, "reason": lookup.get("reason", "not found")}
+    rendered = (
+        f"**{lookup['term']}**: {lookup['definition']} "
+        f"({lookup['source']})"
+    )
+    return {
+        "ok": True,
+        "rendered": rendered,
+        "term": lookup["term"],
+        "definition": lookup["definition"],
+        "source": lookup["source"],
+    }
+
+
+def render_quote(text: Any) -> dict:
+    """박사님 인용 텍스트를 verify 후 표준 표기로 포맷.
+
+    출력 예: '> "외부로부터 주어지는 영감" — 박사님 『미래준비학교』(2016, SOURCES.md § A-01)'
+    """
+    v = verify_quote(text)
+    if not v.get("match"):
+        return {"ok": False, "reason": v.get("reason", "not allowed")}
+    matched = v.get("matched", text if isinstance(text, str) else "")
+    rendered = f'> "{matched}" — 박사님 『미래준비학교』(2016, SOURCES.md § A-01)'
+    return {"ok": True, "rendered": rendered, "matched": matched}
+
+
+# ---------------------------------------------------------------------------
+# 19. VISION-CONTEXT.md § 1 박사님 표준 사전 시드 (seed_standard_glossary)
+# ---------------------------------------------------------------------------
+
+def seed_standard_glossary(base: Any, owner: Any = "사용자") -> dict:
+    """VISION-CONTEXT.md § 1 표준 정의 섹션에 박사님 표준 사전 29개를 한 번에 시드.
+
+    이미 § 1에 entry가 있으면 idempotent (중복 시드 안 함).
+    """
+    if not isinstance(base, str) or not base:
+        return {"ok": False, "reason": "base required"}
+    os.makedirs(base, exist_ok=True)
+    path = os.path.join(base, "VISION-CONTEXT.md")
+    if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(CONTEXT_HEADER_TEMPLATE.format(owner=str(owner) if owner else "사용자"))
+
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    hdr = "## 1. 표준 정의 (박사님 비전 코칭 표준 사전)"
+    # § 1이 없으면 생성
+    if hdr not in content:
+        content += f"\n\n{hdr}\n\n"
+
+    # § 1 영역 추출
+    sec_start = content.find(hdr)
+    nxt = "## 2."
+    sec_end = content.find(nxt, sec_start) if nxt in content else len(content)
+    sec_body = content[sec_start:sec_end]
+
+    # 이미 박사님 표준 entry가 있으면 idempotent
+    if "**비전**:" in sec_body:
+        return {"ok": True, "path": path, "seeded": False, "reason": "already seeded"}
+
+    # 시드 텍스트 생성 — STANDARD_GLOSSARY 모든 entry
+    seed_lines = []
+    for term, payload in STANDARD_GLOSSARY.items():
+        seed_lines.append(f"**{term}**:")
+        seed_lines.append(payload["definition"])
+        if payload.get("avoid"):
+            seed_lines.append(f"_Avoid_: {', '.join(payload['avoid'])}")
+        seed_lines.append(f"_Source_: {payload['source']}")
+        seed_lines.append("")
+    seed_text = "\n".join(seed_lines)
+
+    # § 1 헤더 직후에 삽입
+    insert_at = content.find("\n", sec_start) + 1
+    new_content = content[:insert_at] + "\n" + seed_text + content[insert_at:]
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
+    return {
+        "ok": True,
+        "path": path,
+        "seeded": True,
+        "terms_count": len(STANDARD_GLOSSARY),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 20. VISION-CONTEXT.md 무결성 검증 (validate_context_integrity)
+# ---------------------------------------------------------------------------
+
+REQUIRED_SECTIONS = [
+    "## 1. 표준 정의",
+    "## 2. 본인 맥락 정의",
+    "## 3. 본인 고유 용어",
+    "## 4. 관계",
+    "## 5. 예시 대화",
+    "## 6. 충돌 기록",
+    "## 7. 외부 참조",
+]
+
+
+def validate_context_integrity(base: Any) -> dict:
+    """VISION-CONTEXT.md의 § 1~7 헤더가 모두 존재하고 순서대로인지 검증."""
+    if not isinstance(base, str) or not base:
+        return {"ok": False, "reason": "base required"}
+    path = os.path.join(base, "VISION-CONTEXT.md")
+    if not os.path.exists(path):
+        return {"ok": False, "reason": "VISION-CONTEXT.md not found", "exists": False}
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    missing: list[str] = []
+    positions: dict[str, int] = {}
+    for sec in REQUIRED_SECTIONS:
+        idx = content.find(sec)
+        if idx < 0:
+            missing.append(sec)
+        else:
+            positions[sec] = idx
+
+    # 순서 검증
+    order_ok = True
+    out_of_order: list[str] = []
+    last_pos = -1
+    for sec in REQUIRED_SECTIONS:
+        if sec in positions:
+            if positions[sec] < last_pos:
+                order_ok = False
+                out_of_order.append(sec)
+            last_pos = positions[sec]
+
+    return {
+        "ok": len(missing) == 0 and order_ok,
+        "exists": True,
+        "missing_sections": missing,
+        "out_of_order": out_of_order,
+        "section_count_present": len(positions),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 21. LDR 체인 검증 (validate_ldr_chain) — superseded by 검증
+# ---------------------------------------------------------------------------
+
+def validate_ldr_chain(base: Any) -> dict:
+    """docs/ldr/ 안의 모든 LDR을 스캔하여 'superseded by LDR-NNNN' 참조가
+    실제 LDR 번호로 존재하는지 검증.
+    """
+    if not isinstance(base, str) or not base:
+        return {"ok": False, "reason": "base required"}
+    ldr_dir = os.path.join(base, "docs", "ldr")
+    if not os.path.isdir(ldr_dir):
+        return {"ok": True, "ldr_count": 0, "broken_chains": [], "reason": "no docs/ldr/"}
+
+    # 모든 LDR 번호 수집
+    existing_numbers: set[str] = set()
+    files: list[str] = []
+    for name in os.listdir(ldr_dir):
+        m = LDR_NAME_PATTERN.match(name)
+        if m:
+            existing_numbers.add(m.group(1))
+            files.append(name)
+
+    # 각 파일에서 superseded by 참조 추출
+    broken_chains: list[dict] = []
+    chain_re = re.compile(r"superseded\s+by\s+LDR-(\d{4})", re.IGNORECASE)
+    for fn in files:
+        full = os.path.join(ldr_dir, fn)
+        try:
+            with open(full, "r", encoding="utf-8") as f:
+                content = f.read()
+        except OSError:
+            continue
+        for m in chain_re.finditer(content):
+            ref = m.group(1)
+            if ref not in existing_numbers:
+                broken_chains.append({
+                    "file": fn,
+                    "references": f"LDR-{ref}",
+                    "issue": "referenced LDR does not exist",
+                })
+
+    return {
+        "ok": len(broken_chains) == 0,
+        "ldr_count": len(files),
+        "broken_chains": broken_chains,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 22. three_realm 라벨 ↔ glossary sync (validate_three_realm_sync)
+# ---------------------------------------------------------------------------
+
+THREE_REALM_LABELS = [
+    "개인 욕망", "자기희생·세상일", "왜곡된 사명",
+]
+
+
+def validate_three_realm_sync() -> dict:
+    """three_realm_check가 출력하는 7개 라벨이 STANDARD_GLOSSARY에 등재되어 있는지 검증."""
+    missing: list[str] = []
+    for label in THREE_REALM_LABELS:
+        if label not in STANDARD_GLOSSARY:
+            missing.append(label)
+    return {
+        "ok": len(missing) == 0,
+        "labels_checked": THREE_REALM_LABELS,
+        "missing_in_glossary": missing,
+    }
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -1300,9 +1680,39 @@ def main() -> int:
     sub.add_parser("menu_options")
     sub.add_parser("validate_glossary_sync")
     sub.add_parser("validate_quotes_sync")
+    sub.add_parser("validate_three_realm_sync")
 
     p = sub.add_parser("validate_topic_map_skills")
     p.add_argument("--skills-root", default=None, dest="skills_root")
+
+    # 신규 v2 함수들
+    p = sub.add_parser("select_honorific")
+    p.add_argument("--meta-json", required=True, dest="meta_json", help="JSON string of meta dict")
+
+    p = sub.add_parser("render_ldr_body")
+    p.add_argument("--title", required=True)
+    p.add_argument("--date", required=True, dest="date_iso")
+    p.add_argument("--area", required=True)
+    p.add_argument("--reason", required=True)
+    p.add_argument("--status", default=None)
+    p.add_argument("--options-json", default=None, dest="options_json")
+    p.add_argument("--consequences-json", default=None, dest="consequences_json")
+
+    p = sub.add_parser("render_definition")
+    p.add_argument("--term", required=True)
+
+    p = sub.add_parser("render_quote")
+    p.add_argument("--text", required=True)
+
+    p = sub.add_parser("seed_standard_glossary")
+    p.add_argument("--base", required=True)
+    p.add_argument("--owner", default="사용자")
+
+    p = sub.add_parser("validate_context_integrity")
+    p.add_argument("--base", required=True)
+
+    p = sub.add_parser("validate_ldr_chain")
+    p.add_argument("--base", required=True)
 
     args = parser.parse_args()
 
@@ -1369,6 +1779,37 @@ def main() -> int:
         out = validate_quotes_sync()
     elif args.cmd == "validate_topic_map_skills":
         out = validate_topic_map_skills(args.skills_root)
+    elif args.cmd == "validate_three_realm_sync":
+        out = validate_three_realm_sync()
+    elif args.cmd == "select_honorific":
+        try:
+            meta = json.loads(args.meta_json) if args.meta_json else {}
+        except json.JSONDecodeError as e:
+            out = {"honorific": HONORIFIC_DEFAULT, "reason": f"invalid JSON: {e}"}
+        else:
+            out = select_honorific(meta)
+    elif args.cmd == "render_ldr_body":
+        opts = json.loads(args.options_json) if args.options_json else None
+        cons = json.loads(args.consequences_json) if args.consequences_json else None
+        out = render_ldr_body(
+            title=args.title,
+            date_iso=args.date_iso,
+            area=args.area,
+            reason=args.reason,
+            status=args.status,
+            options_considered=opts,
+            consequences=cons,
+        )
+    elif args.cmd == "render_definition":
+        out = render_definition(args.term)
+    elif args.cmd == "render_quote":
+        out = render_quote(args.text)
+    elif args.cmd == "seed_standard_glossary":
+        out = seed_standard_glossary(args.base, args.owner)
+    elif args.cmd == "validate_context_integrity":
+        out = validate_context_integrity(args.base)
+    elif args.cmd == "validate_ldr_chain":
+        out = validate_ldr_chain(args.base)
     else:  # pragma: no cover
         parser.error(f"unknown command: {args.cmd}")
         return 2

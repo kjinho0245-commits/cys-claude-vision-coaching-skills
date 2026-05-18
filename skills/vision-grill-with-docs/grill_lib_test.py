@@ -415,6 +415,180 @@ def test_sync_validators():
     out = grill_lib.validate_topic_map_skills()
     expect("sync topic_map vision-* ok", out["ok"], json.dumps(out, ensure_ascii=False))
 
+    out = grill_lib.validate_three_realm_sync()
+    expect("sync three_realm labels ok", out["ok"], json.dumps(out, ensure_ascii=False))
+
+
+# ---------------------------------------------------------------------------
+# 18. select_honorific
+# ---------------------------------------------------------------------------
+
+def test_select_honorific():
+    expect("honorific 박사님", grill_lib.select_honorific({"is_doctor": True})["honorific"] == "박사님")
+    expect("honorific 목사님", grill_lib.select_honorific({"title": "목사"})["honorific"] == "목사님")
+    expect("honorific 김도현님", grill_lib.select_honorific({"name": "김도현"})["honorific"] == "김도현님")
+    expect("honorific 기본 선생님", grill_lib.select_honorific({})["honorific"] == "선생님")
+    expect("honorific None 안전", grill_lib.select_honorific(None)["honorific"] == "선생님")  # type: ignore
+    expect("honorific 이미 님 붙은 title", grill_lib.select_honorific({"title": "장로님"})["honorific"] == "장로님")
+
+
+# ---------------------------------------------------------------------------
+# 19. render_ldr_body
+# ---------------------------------------------------------------------------
+
+def test_render_ldr_body():
+    out = grill_lib.render_ldr_body(
+        title="진로 — 공학에서 신학으로",
+        date_iso="2026-05-18",
+        area="진로",
+        reason="박사님 표준 소명 정의 응답 더 분명",
+    )
+    expect("LDR body ok", out["ok"])
+    expect("LDR body 제목 포함", "진로 — 공학에서 신학으로" in out["body"])
+    expect("LDR body 날짜 포함", "2026-05-18" in out["body"])
+    expect("LDR body 알려진 영역", out["is_known_area"])
+
+    # 선택 섹션
+    out2 = grill_lib.render_ldr_body(
+        title="결혼 결단",
+        date_iso="2027-09-01",
+        area="관계",
+        reason="배우자와 비전 공유 확인",
+        status="accepted",
+        options_considered=["1년 더 교제 후", "혼자 살기"],
+        consequences=["가족 합가 검토 필요"],
+    )
+    expect("LDR body status 포함", "**Status**: accepted" in out2["body"])
+    expect("LDR body 고려한 대안", "## 고려한 대안" in out2["body"])
+    expect("LDR body Consequences", "## Consequences" in out2["body"])
+
+    # 잘못된 날짜
+    bad = grill_lib.render_ldr_body(title="x", date_iso="2026/5/18", area="x", reason="x")
+    expect("LDR body 잘못된 날짜 FAIL", not bad["ok"])
+    # 빈 인자
+    expect("LDR body 빈 title", not grill_lib.render_ldr_body(title="", date_iso="2026-05-18", area="진로", reason="x")["ok"])
+    expect("LDR body 빈 reason", not grill_lib.render_ldr_body(title="x", date_iso="2026-05-18", area="진로", reason="")["ok"])
+
+
+# ---------------------------------------------------------------------------
+# 20. render_definition / render_quote
+# ---------------------------------------------------------------------------
+
+def test_render_definition_and_quote():
+    out = grill_lib.render_definition("비전")
+    expect("render_def 비전 ok", out["ok"] and "**비전**" in out["rendered"] and "SOURCES.md" in out["rendered"])
+
+    out = grill_lib.render_definition("Vision")  # 영문 lookup
+    expect("render_def 영문 lookup ok", out["ok"])
+
+    out = grill_lib.render_definition("외계어")
+    expect("render_def 없음 FAIL", not out["ok"])
+
+    out = grill_lib.render_quote("외부로부터 주어지는 영감")
+    expect("render_quote 정확 인용 ok", out["ok"] and "SOURCES.md § A-01" in out["rendered"])
+
+    out = grill_lib.render_quote("박사님께서 외부로부터 주어지는 영감이라 했지만 이는 잘못이다")
+    expect("render_quote 위조 차단", not out["ok"])
+
+
+# ---------------------------------------------------------------------------
+# 21. 영문 lookup
+# ---------------------------------------------------------------------------
+
+def test_english_lookup():
+    for en in ("Vision", "Mission", "Calling", "Spiritual Intuition", "Reinforcing Feedback Loop"):
+        out = grill_lib.glossary_lookup(en)
+        expect(f"lookup 영문 {en}", out["found"] and out.get("matched_via", "").startswith("english"))
+
+    # 대소문자 무시
+    out = grill_lib.glossary_lookup("vision")
+    expect("lookup 영문 소문자 vision", out["found"])
+
+
+# ---------------------------------------------------------------------------
+# 22. seed_standard_glossary — idempotent
+# ---------------------------------------------------------------------------
+
+def test_seed_standard_glossary():
+    with tempfile.TemporaryDirectory() as tmp:
+        out = grill_lib.seed_standard_glossary(tmp, owner="박사님")
+        expect("seed ok", out["ok"] and out["seeded"])
+        with open(out["path"], "r", encoding="utf-8") as f:
+            c = f.read()
+        expect("seed 비전 entry", "**비전**:" in c)
+        expect("seed 가치 있는 시대적 소명", "가치 있는 시대적 소명" in c)
+        expect("seed Source 명시", "SOURCES.md § A-01" in c)
+
+        # idempotent
+        out2 = grill_lib.seed_standard_glossary(tmp, owner="박사님")
+        expect("seed idempotent — 두 번째 호출 seeded=False", out2["ok"] and not out2["seeded"])
+
+
+# ---------------------------------------------------------------------------
+# 23. validate_context_integrity
+# ---------------------------------------------------------------------------
+
+def test_validate_context_integrity():
+    with tempfile.TemporaryDirectory() as tmp:
+        # 파일 없음
+        out = grill_lib.validate_context_integrity(tmp)
+        expect("integrity 파일 없음 FAIL", not out["ok"] and not out["exists"])
+
+        # 정상 파일 (upsert_term이 만든 표준 헤더 7개)
+        grill_lib.upsert_term(tmp, "test", "test def", section="2")
+        out = grill_lib.validate_context_integrity(tmp)
+        expect("integrity 정상 헤더 PASS", out["ok"], json.dumps(out, ensure_ascii=False))
+
+        # 손상 시뮬레이션 — § 4 삭제
+        path = os.path.join(tmp, "VISION-CONTEXT.md")
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        damaged = content.replace("## 4. 관계", "")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(damaged)
+        out = grill_lib.validate_context_integrity(tmp)
+        expect("integrity 손상 검출", not out["ok"] and "## 4. 관계" in out["missing_sections"])
+
+
+# ---------------------------------------------------------------------------
+# 24. validate_ldr_chain
+# ---------------------------------------------------------------------------
+
+def test_validate_ldr_chain():
+    with tempfile.TemporaryDirectory() as tmp:
+        # LDR 폴더 없음
+        out = grill_lib.validate_ldr_chain(tmp)
+        expect("chain LDR 폴더 없음 ok", out["ok"] and out["ldr_count"] == 0)
+
+        ldr = os.path.join(tmp, "docs", "ldr")
+        os.makedirs(ldr)
+        # 정상 체인
+        open(os.path.join(ldr, "0001-a.md"), "w").write("# A\n\n**Status**: deprecated, superseded by LDR-0002\n")
+        open(os.path.join(ldr, "0002-b.md"), "w").write("# B\n")
+        out = grill_lib.validate_ldr_chain(tmp)
+        expect("chain 정상 superseded by 0002 ok", out["ok"] and out["ldr_count"] == 2)
+
+        # 깨진 체인
+        open(os.path.join(ldr, "0003-c.md"), "w").write("# C\n\nsuperseded by LDR-9999\n")
+        out = grill_lib.validate_ldr_chain(tmp)
+        expect("chain 깨진 참조 검출", not out["ok"] and len(out["broken_chains"]) == 1)
+
+
+# ---------------------------------------------------------------------------
+# 25. scenario_expand 주제 치환
+# ---------------------------------------------------------------------------
+
+def test_scenario_expand_topic_inject():
+    out = grill_lib.scenario_expand("강남 아파트 매도")
+    expect("scenario 주제 치환 5년", "강남 아파트 매도" in out["scenarios"][0]["prompt"])
+    expect("scenario 주제 치환 10년", "강남 아파트 매도" in out["scenarios"][1]["prompt"])
+    expect("scenario 주제 치환 실패", "강남 아파트 매도" in out["scenarios"][2]["prompt"])
+    expect("scenario 주제 치환 기회비용", "강남 아파트 매도" in out["scenarios"][3]["prompt"])
+
+    # 빈 주제 → '이 결정'
+    out = grill_lib.scenario_expand("")
+    expect("scenario 빈 주제 → 이 결정", "이 결정" in out["scenarios"][0]["prompt"])
+
 
 # ---------------------------------------------------------------------------
 # Main
@@ -439,6 +613,14 @@ def main() -> int:
     test_slug_normalize()
     test_menu_options()
     test_sync_validators()
+    test_select_honorific()
+    test_render_ldr_body()
+    test_render_definition_and_quote()
+    test_english_lookup()
+    test_seed_standard_glossary()
+    test_validate_context_integrity()
+    test_validate_ldr_chain()
+    test_scenario_expand_topic_inject()
 
     total = PASS + FAIL
     print()

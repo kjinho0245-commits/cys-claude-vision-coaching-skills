@@ -261,22 +261,39 @@ skills/vision-grill-with-docs/
 | 박사님 사전 ↔ glossary_standard.md sync | `python3 grill_lib.py validate_glossary_sync` |
 | 박사님 인용 ↔ SOURCES.md § A sync | `python3 grill_lib.py validate_quotes_sync` |
 | topic_skill_map.md ↔ 실제 skills/ 폴더 sync | `python3 grill_lib.py validate_topic_map_skills` |
+| three_realm 라벨 ↔ 박사님 사전 sync | `python3 grill_lib.py validate_three_realm_sync` |
+| VISION-CONTEXT.md 헤더 7개 무결성 검사 | `python3 grill_lib.py validate_context_integrity --base <작업폴더>` |
+| LDR superseded by 체인 검증 | `python3 grill_lib.py validate_ldr_chain --base <작업폴더>` |
+
+### 6-F. 인터뷰 톤·산출물 포맷 (v2 보강)
+
+박사님 vision 시리즈 일관 규약을 결정론으로 적용. 인터뷰 발화·LDR 본문·인용 표기를 LLM이 자연어로 재구성하지 않는다.
+
+| 단계 | 호출 명령 |
+|---|---|
+| 호칭 결정 (박사님·목사님·이름님·선생님) | `python3 grill_lib.py select_honorific --meta-json '{"is_doctor":true}'` |
+| 박사님 정의 한 줄 포맷 (term → "**비전**: 가치 있는 시대적 소명 (출처)") | `python3 grill_lib.py render_definition --term "<용어>"` |
+| 박사님 인용 표준 포맷 (verify + 출처 표기) | `python3 grill_lib.py render_quote --text "<인용>"` |
+| LDR 본문 자동 생성 (최소 템플릿 + 선택 섹션) | `python3 grill_lib.py render_ldr_body --title "..." --date YYYY-MM-DD --area "..." --reason "..."` |
+| VISION-CONTEXT.md § 1 박사님 표준 사전 시드 (idempotent) | `python3 grill_lib.py seed_standard_glossary --base "<작업폴더>" --owner "..."` |
 
 → 위 함수들의 출력(JSON)을 그대로 사용자에게 보여주지 말고, **인터뷰 톤으로 풀어서** 사용자에게 전달.
 → 단, `verify_quote`·`emoji_check`·SYNC 검증 결과는 *내부 검증용* — 사용자에게 굳이 보일 필요 없음.
 
-## 6-F. 결정론 환원 원칙 (반복 검증의 핵심)
+## 6-G. 결정론 환원 원칙 (반복 검증의 핵심)
 
-다음 작업은 LLM이 자연어로 *절대* 재추론하지 않는다 — 모두 grill_lib.py 함수 호출로 처리:
+다음 작업은 LLM이 자연어로 *절대* 재추론하지 않는다 — 모두 grill_lib.py 함수 호출로 처리. 총 **31개 결정론 함수**:
 
-1. **사실 조회** — 박사님 표준 사전 정의: `glossary_lookup`
-2. **번호 매핑** — LDR 번호 부여: `next_ldr_number` (4자리·9999 boundary)
-3. **존재 검증** — 작업 폴더·VISION-CONTEXT 구조: `is_multi_context`·`list_contexts`
+1. **사실 조회** — 박사님 표준 사전 정의(한글·영문 alias): `glossary_lookup`·`render_definition`
+2. **번호 매핑** — LDR 번호 부여: `next_ldr_number` (4자리·9999 boundary)·`slug_normalize`
+3. **존재 검증** — 작업 폴더·VISION-CONTEXT 구조·헤더 무결성: `is_multi_context`·`list_contexts`·`validate_context_integrity`
 4. **범위 검사** — 3영역 균형 7가지 패턴: `three_realm_check`
-5. **인용 검증** — 박사님 인용 위조 차단: `verify_quote`
-6. **사전 충돌** — avoid 단어·개인정의 분기: `detect_glossary_conflict`
-7. **LDR 자격** — 3조건 자동 판정: `check_ldr_criteria`
-8. **drift 검증** — 사양 문서 ↔ 코드 sync: `validate_glossary_sync`·`validate_quotes_sync`·`validate_topic_map_skills`
+5. **인용 검증** — 박사님 인용 위조 차단·표준 표기: `verify_quote`·`render_quote`
+6. **사전 충돌** — avoid 단어·개인정의 분기·§ 6 자동 기록: `detect_glossary_conflict`·`flag_conflict`
+7. **LDR 자격·본문·체인** — 3조건 판정·본문 자동 생성·superseded by 검증: `check_ldr_criteria`·`render_ldr_body`·`validate_ldr_chain`
+8. **drift 검증** — 사양 문서 ↔ 코드 sync 5종: `validate_glossary_sync`·`validate_quotes_sync`·`validate_topic_map_skills`·`validate_three_realm_sync`·`validate_context_integrity`
+9. **인터뷰 톤** — 호칭·시드·시나리오·메뉴: `select_honorific`·`seed_standard_glossary`·`scenario_expand`(주제 치환)·`menu_options`
+10. **이모지 차단** — 박사님 시리즈 표준: `emoji_check`
 
 ---
 
