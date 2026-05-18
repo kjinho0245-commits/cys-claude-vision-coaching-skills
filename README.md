@@ -5,7 +5,7 @@
 
 <!-- AUTO:BADGE -->
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-[![Skills: 26](https://img.shields.io/badge/Skills-26-blue)](docs/SKILL_CATALOG.md)
+[![Skills: 27](https://img.shields.io/badge/Skills-27-blue)](docs/SKILL_CATALOG.md)
 [![Korean](https://img.shields.io/badge/언어-한국어%20%2B%20English-success)](#)
 <!-- /AUTO:BADGE -->
 
@@ -204,7 +204,8 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 | 2 | **박사님 책 토대 — 척추 도식 (Spine)** | 5 | 5·6·8단계 |
 | 3 | **박사님 책 토대 — 살·근육 + 응용 (Flesh + Applied)** | 7 | 2·3·4·7단계 |
 | 4 | **처방·실행 (Prescription)** | 7 | 5·7·8단계 |
-| | **합계** | **26** | |
+| 5 | **메타 인터뷰 (Cross-stage) (Meta-Interview)** | 1 | 전 단계 |
+| | **합계** | **27** | |
 <!-- /AUTO:CATEGORY_TABLE -->
 
 ### 📋 전체 스킬 인덱스 / Skill Index (auto-generated)
@@ -238,6 +239,7 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 | Prescription | `vision-strategy-coach` | 7 | 사용자의 비전(Vision)을 구체적·단계별 행동(Action)으로 변환하는 통합 전략 코칭 스킬. 전략 계획·코칭 실무에서… |
 | Prescription | `vision-follow-through-habits` | 8 | 결심·계획이 습관·일상 시스템으로 정착하도록 설계하는 실행 지속력 코칭 스킬. BJ Fogg(Tiny Habits, 2019)… |
 | Prescription | `vision-progress-review` | 8 | 사용자의 비전·목표·행동 계획 진척을 주간·월간·분기·연간 4단위 정기 점검으로 추적·평가·재조정하는 진척 추적 스킬. 결정론… |
+| Meta-Interview | `vision-grill-with-docs` | — | 미래비전코칭의 모든 단계에서 사용자가 난관에 부딪히거나 생각이 정리되지 않을 때 호출하는 다목적 인터뷰 엔진 스킬. Matt… |
 <!-- /AUTO:SKILL_INDEX -->
 
 ### 🔗 박사님 8단계 ↔ 스킬 흐름도 / 8-Stage Flow Diagram

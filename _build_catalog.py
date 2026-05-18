@@ -66,6 +66,12 @@ CATEGORIES = {
         "stages_ko": "5·7·8단계",
         "order": 4,
     },
+    "meta": {
+        "label_ko": "메타 인터뷰 (Cross-stage)",
+        "label_en": "Meta-Interview",
+        "stages_ko": "전 단계",
+        "order": 5,
+    },
 }
 
 STAGE_TITLES = {
@@ -107,6 +113,7 @@ DEFAULT_META = {
     "vision-financial-coach": ("prescription", [7]),
     "vision-follow-through-habits": ("prescription", [8]),
     "vision-progress-review": ("prescription", [8]),
+    "vision-grill-with-docs": ("meta", []),
 }
 
 
