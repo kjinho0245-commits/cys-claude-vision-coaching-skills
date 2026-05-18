@@ -381,10 +381,15 @@ ENGLISH_ALIASES: dict[str, str] = {
     "Mission Frame": "비전 프레임",
     "Spiritual Intuition": "영적 직관력",
     "Divine Inspiration": "영감",
+    "Inspiration": "영감",
     "Divine Value": "정신적 가치",
+    "Spiritual Value": "정신적 가치",
+    "Moral Value": "정신적 가치",
     "Intellectual Judgment": "이성적 판단력",
+    "Rational Judgment": "이성적 판단력",
     "Information": "정보",
     "Forecasting Framework": "예측 구성",
+    "Forecasting": "예측 구성",
     "Reinforcing Feedback Loop": "강화 피드백 루프",
     "Three Realms": "3영역",
     "Self": "나",
@@ -393,6 +398,29 @@ ENGLISH_ALIASES: dict[str, str] = {
     "Self-Sacrifice": "자기희생·세상일",
     "Distorted Mission": "왜곡된 사명",
     "LDR": "Life Decision Record",
+    "Life Decision Record": "Life Decision Record",
+    "ADR": "Life Decision Record",
+    # § 5 진단 어휘
+    "Four Skill Balance": "4 Skill Balance",
+    "4 Skills": "4 Skill Balance",
+    "Four Skills": "4 Skill Balance",
+    "Multiple Intelligences": "9가지 다중지능",
+    "MI": "9가지 다중지능",
+    "Nine Intelligences": "9가지 다중지능",
+    "Ten Vision Codes": "10개 비전 코드",
+    "Ten Codes": "10개 비전 코드",
+    "Vision Codes": "10개 비전 코드",
+    "MBTI": "MBTI 16유형",
+    "Myers-Briggs": "MBTI 16유형",
+    "Enneagram": "에니어그램 9유형",
+    "Enneagram 9": "에니어그램 9유형",
+    "Strong Interest Inventory": "STRONG 직업 흥미검사",
+    "SII": "STRONG 직업 흥미검사",
+    # § 6 LDR 어휘
+    "Hard to Reverse": "Hard to reverse",
+    "Surprising Without Context": "Surprising without context",
+    "Real Trade-off": "Real trade-off",
+    "Real Tradeoff": "Real trade-off",
 }
 
 
@@ -445,8 +473,11 @@ def detect_glossary_conflict(text: Any) -> dict:
                 "standard_definition": STANDARD_GLOSSARY[std_term]["definition"],
             })
 
-    # 규칙 2 — "내 X은 Y" 형식 분기 검출 (4 핵심 어휘)
-    for std_term in ("소명", "비전", "미션", "가치"):
+    # 규칙 2 — "내 X은 Y" 형식 분기 검출 (확장: 7개 핵심 어휘)
+    #
+    # 박사님 비전 프레임의 핵심 어휘 — 사용자가 본인 정의를 슬쩍 끼워 넣을 때
+    # 자동 검출. 4 → 7 확장: '시대', '영감', '정신적 가치' 추가.
+    for std_term in ("소명", "비전", "미션", "가치", "시대", "영감", "정신적 가치"):
         pattern = rf"(?:내|나의|저의|본인의)\s*{std_term}\s*(?:은|는)\s*(.{{1,80}}?)(?:[.。!?]|입니다|이다|이에요|예요|$)"
         m = re.search(pattern, text)
         if m:
@@ -1013,7 +1044,11 @@ def flag_conflict(
     user_usage: Any,
     resolution: Any,
 ) -> dict:
-    """VISION-CONTEXT.md § 6 충돌 기록 자동 추가."""
+    """VISION-CONTEXT.md § 6 충돌 기록 자동 추가.
+
+    multi-context 모드(VISION-CONTEXT-MAP.md 존재)일 때 root에 단일 파일을 만들지 않는다.
+    호출자는 영역 폴더를 base로 다시 호출해야 한다 (upsert_term과 일관).
+    """
     if not isinstance(base, str) or not base:
         return {"ok": False, "reason": "base required"}
     if not isinstance(term, str) or not term.strip():
@@ -1024,6 +1059,15 @@ def flag_conflict(
         return {"ok": False, "reason": "resolution required"}
 
     os.makedirs(base, exist_ok=True)
+    # multi-context root 차단 — VISION-CONTEXT-MAP.md 있고 영역 폴더가 아니면 거부
+    if os.path.exists(os.path.join(base, "VISION-CONTEXT-MAP.md")):
+        return {
+            "ok": False,
+            "reason": (
+                "base appears to be a multi-context root (VISION-CONTEXT-MAP.md present). "
+                "Call flag_conflict with the area folder as base, not the root."
+            ),
+        }
     path = os.path.join(base, "VISION-CONTEXT.md")
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
@@ -1093,7 +1137,9 @@ def emoji_check(text: Any) -> dict:
 # 13. 슬러그 정규화 (LDR 파일명·VISION-CONTEXT 영역명)
 # ---------------------------------------------------------------------------
 
-SLUG_KEEP_RE = re.compile(r"[A-Za-z0-9가-힯ㄱ-ㆎ]+")
+# 한글(완성형·자모) + 영문·숫자 + CJK 통합 한자(U+4E00–U+9FFF) + CJK 확장 A(U+3400–U+4DBF)
+# 박사님 사용자 결정 제목에 한자(人生·大選擇·소명·천명 등)가 들어올 수 있어 보존.
+SLUG_KEEP_RE = re.compile(r"[A-Za-z0-9가-힯ㄱ-ㆎ一-鿿㐀-䶿]+")
 
 
 def slug_normalize(title: Any, max_len: int = 60) -> dict:
@@ -1418,13 +1464,25 @@ def render_quote(text: Any) -> dict:
 # ---------------------------------------------------------------------------
 
 def seed_standard_glossary(base: Any, owner: Any = "사용자") -> dict:
-    """VISION-CONTEXT.md § 1 표준 정의 섹션에 박사님 표준 사전 29개를 한 번에 시드.
+    """VISION-CONTEXT.md § 1 표준 정의 섹션에 박사님 표준 사전을 한 번에 시드.
 
     이미 § 1에 entry가 있으면 idempotent (중복 시드 안 함).
+    seeded entry 수는 동적으로 STANDARD_GLOSSARY 길이를 반영한다.
+
+    multi-context root는 거부 — 영역 폴더로 호출해야 한다.
     """
     if not isinstance(base, str) or not base:
         return {"ok": False, "reason": "base required"}
     os.makedirs(base, exist_ok=True)
+    # multi-context root 차단 — 일관성을 위해 upsert_term·flag_conflict와 동일 정책
+    if os.path.exists(os.path.join(base, "VISION-CONTEXT-MAP.md")):
+        return {
+            "ok": False,
+            "reason": (
+                "base appears to be a multi-context root (VISION-CONTEXT-MAP.md present). "
+                "Call seed_standard_glossary with the area folder as base, not the root."
+            ),
+        }
     path = os.path.join(base, "VISION-CONTEXT.md")
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
@@ -1489,16 +1547,10 @@ REQUIRED_SECTIONS = [
 ]
 
 
-def validate_context_integrity(base: Any) -> dict:
-    """VISION-CONTEXT.md의 § 1~7 헤더가 모두 존재하고 순서대로인지 검증."""
-    if not isinstance(base, str) or not base:
-        return {"ok": False, "reason": "base required"}
-    path = os.path.join(base, "VISION-CONTEXT.md")
-    if not os.path.exists(path):
-        return {"ok": False, "reason": "VISION-CONTEXT.md not found", "exists": False}
+def _validate_context_file(path: str) -> dict:
+    """한 CONTEXT.md(또는 VISION-CONTEXT.md)의 § 1~7 헤더 무결성 검증."""
     with open(path, "r", encoding="utf-8") as f:
         content = f.read()
-
     missing: list[str] = []
     positions: dict[str, int] = {}
     for sec in REQUIRED_SECTIONS:
@@ -1507,8 +1559,6 @@ def validate_context_integrity(base: Any) -> dict:
             missing.append(sec)
         else:
             positions[sec] = idx
-
-    # 순서 검증
     order_ok = True
     out_of_order: list[str] = []
     last_pos = -1
@@ -1518,14 +1568,64 @@ def validate_context_integrity(base: Any) -> dict:
                 order_ok = False
                 out_of_order.append(sec)
             last_pos = positions[sec]
-
     return {
         "ok": len(missing) == 0 and order_ok,
-        "exists": True,
+        "path": path,
         "missing_sections": missing,
         "out_of_order": out_of_order,
         "section_count_present": len(positions),
     }
+
+
+def validate_context_integrity(base: Any) -> dict:
+    """VISION-CONTEXT.md(단일) 또는 각 영역 CONTEXT.md(멀티) 모두 자동 인식 검증.
+
+    - 단일 모드: <base>/VISION-CONTEXT.md를 검증.
+    - 멀티 모드: VISION-CONTEXT-MAP.md 인식 후 모든 영역 CONTEXT.md를 순회 검증.
+                전체 영역이 PASS여야 ok=True.
+    """
+    if not isinstance(base, str) or not base:
+        return {"ok": False, "reason": "base required"}
+
+    cm = os.path.join(base, "VISION-CONTEXT-MAP.md")
+    single = os.path.join(base, "VISION-CONTEXT.md")
+
+    if os.path.exists(cm):
+        # multi 모드 — 모든 영역 CONTEXT.md 순회
+        per_area: list[dict] = []
+        all_ok = True
+        for entry in sorted(os.listdir(base)):
+            full = os.path.join(base, entry)
+            if not os.path.isdir(full):
+                continue
+            if entry.startswith(".") or entry in ("docs", "__pycache__"):
+                continue
+            ctx = os.path.join(full, "CONTEXT.md")
+            if not os.path.exists(ctx):
+                per_area.append({"area": entry, "ok": False, "reason": "CONTEXT.md missing"})
+                all_ok = False
+                continue
+            result = _validate_context_file(ctx)
+            per_area.append({"area": entry, **result})
+            if not result["ok"]:
+                all_ok = False
+        return {
+            "ok": all_ok,
+            "exists": True,
+            "structure": "multi",
+            "areas_checked": len(per_area),
+            "per_area": per_area,
+        }
+
+    if not os.path.exists(single):
+        return {
+            "ok": False,
+            "reason": "VISION-CONTEXT.md not found (and no multi-context VISION-CONTEXT-MAP.md)",
+            "exists": False,
+            "structure": "none",
+        }
+    result = _validate_context_file(single)
+    return {**result, "exists": True, "structure": "single"}
 
 
 # ---------------------------------------------------------------------------

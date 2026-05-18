@@ -212,7 +212,7 @@ skills/vision-grill-with-docs/
 ## 6. 결정론 모듈 (`grill_lib.py`) 호출 규약
 
 다음 단계는 **반드시** `grill_lib.py`를 호출해서 처리한다. LLM 자연어 추정 금지.
-함수는 21개 — 사실 조회·번호 매핑·날짜·범위 검사·존재 검증·sync 대조 모두 결정론으로 환원되어 있다.
+함수는 **총 32개**(CLI dispatcher `main` 제외) — 사실 조회·번호 매핑·날짜·범위 검사·존재 검증·sync 대조·한국 대학 데이터 조회까지 모두 결정론으로 환원되어 있다.
 
 ### 6-A. 진입·라우팅
 
@@ -280,20 +280,33 @@ skills/vision-grill-with-docs/
 → 위 함수들의 출력(JSON)을 그대로 사용자에게 보여주지 말고, **인터뷰 톤으로 풀어서** 사용자에게 전달.
 → 단, `verify_quote`·`emoji_check`·SYNC 검증 결과는 *내부 검증용* — 사용자에게 굳이 보일 필요 없음.
 
+### 6-G-pre. 한국 대학·진로 데이터 (결정론 백본)
+
+진로·전공·학교 grill 시 LLM이 학교명·전공명·소재지를 *자연어로 추정*하지 않는다. 반드시 캐시된 ystory/korea-universities (커리어넷·한국유학종합시스템 공공자료) 데이터를 조회.
+
+| 단계 | 호출 명령 |
+|---|---|
+| 학교명·지역·학교급별 조회 | `python3 grill_lib.py lookup_korean_university --name "<부분일치>" --region "<지역>" --level "<대학(4년제)\|전문대학(2-3년제)\|대학원대학>" --accredited-degree true --limit 20` |
+| 캐시 강제 갱신 | `python3 grill_lib.py refresh_university_cache --force` |
+| 캐시 무결성·신선도 검증 | `python3 grill_lib.py validate_university_cache_sync` |
+
+캐시 정책: 첫 호출 시 GitHub raw에서 fetch → `~/.cache/vision-grill-with-docs/` 7일 TTL → 네트워크 실패 시 stale fallback. 자세한 사양은 grill_lib.py § 23.
+
 ## 6-G. 결정론 환원 원칙 (반복 검증의 핵심)
 
-다음 작업은 LLM이 자연어로 *절대* 재추론하지 않는다 — 모두 grill_lib.py 함수 호출로 처리. 총 **31개 결정론 함수**:
+다음 작업은 LLM이 자연어로 *절대* 재추론하지 않는다 — 모두 grill_lib.py 함수 호출로 처리. 총 **32개 결정론 함수**(`main` CLI dispatcher 제외):
 
 1. **사실 조회** — 박사님 표준 사전 정의(한글·영문 alias): `glossary_lookup`·`render_definition`
 2. **번호 매핑** — LDR 번호 부여: `next_ldr_number` (4자리·9999 boundary)·`slug_normalize`
 3. **존재 검증** — 작업 폴더·VISION-CONTEXT 구조·헤더 무결성: `is_multi_context`·`list_contexts`·`validate_context_integrity`
 4. **범위 검사** — 3영역 균형 7가지 패턴: `three_realm_check`
 5. **인용 검증** — 박사님 인용 위조 차단·표준 표기: `verify_quote`·`render_quote`
-6. **사전 충돌** — avoid 단어·개인정의 분기·§ 6 자동 기록: `detect_glossary_conflict`·`flag_conflict`
+6. **사전 충돌** — avoid 단어·개인정의 분기(7개 핵심 어휘)·§ 6 자동 기록: `detect_glossary_conflict`·`flag_conflict`
 7. **LDR 자격·본문·체인** — 3조건 판정·본문 자동 생성·superseded by 검증: `check_ldr_criteria`·`render_ldr_body`·`validate_ldr_chain`
-8. **drift 검증** — 사양 문서 ↔ 코드 sync 5종: `validate_glossary_sync`·`validate_quotes_sync`·`validate_topic_map_skills`·`validate_three_realm_sync`·`validate_context_integrity`
+8. **drift 검증** — 사양 문서 ↔ 코드 sync 6종: `validate_glossary_sync`·`validate_quotes_sync`·`validate_topic_map_skills`·`validate_three_realm_sync`·`validate_context_integrity`·`validate_university_cache_sync`
 9. **인터뷰 톤** — 호칭·시드·시나리오·메뉴: `select_honorific`·`seed_standard_glossary`·`scenario_expand`(주제 치환)·`menu_options`
 10. **이모지 차단** — 박사님 시리즈 표준: `emoji_check`
+11. **한국 대학·진로 데이터 조회** — 학과·전공 grill 시 결정론 데이터로 환원 (LLM 학교명 추정 금지): `lookup_korean_university`·`refresh_university_cache` (TTL 7일·ystory/korea-universities 백본)·`validate_university_cache_sync`
 
 ---
 

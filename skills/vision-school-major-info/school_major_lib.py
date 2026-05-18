@@ -25,6 +25,7 @@ import os
 import re
 import stat
 import sys
+import time
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -38,21 +39,40 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 CONFIG_DIR = os.path.expanduser("~/.config/vision-school-major-info")
 KEYS_PATH = os.path.join(CONFIG_DIR, "api_keys.json")
+CACHE_DIR = os.path.expanduser("~/.cache/vision-school-major-info")
 
 VALID_KEY_NAMES = ("data_go_kr", "onet")
 
+# 데이터셋 ID → 호출 endpoint URL.
+# - 커리어넷 4개(15057878·15058917·15056641·15057135): 모두 career.go.kr OpenAPI 단일 게이트웨이 (svcCode 분기).
+# - KCUE 3개(15116892·15037507·15116816): 공공데이터포털 apis.data.go.kr 게이트웨이.
+# 각 endpoint 명세는 SOURCES.md A-01~A-07 참조.
 DATA_GO_KR_ENDPOINTS = {
-    # 데이터셋 ID: (도메인 + 경로)
-    "15057878": "https://www.career.go.kr/cnet/openapi/getOpenApi",  # 커리어넷 학과정보
-    "15058917": "https://www.career.go.kr/cnet/openapi/getOpenApi",  # 커리어넷 학교정보
-    "15056641": "https://www.career.go.kr/cnet/openapi/getOpenApi",  # 커리어넷 직업정보
-    "15057135": "https://www.career.go.kr/cnet/openapi/getOpenApi",  # 커리어넷 진로자료
+    "15057878": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 대학학과정보
+    "15058917": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 학교정보
+    "15056641": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 직업정보
+    "15057135": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 진로자료
     "15116892": "https://apis.data.go.kr/B552103/UnivMajorInfoService/getUnivMajorInfo",
     "15037507": "https://apis.data.go.kr/B552103/HEducationInfoService/getUnivInfo",
     "15116816": "https://apis.data.go.kr/B552103/UnivInfoService/getUnivInfo",
 }
 
+# 데이터셋 ID → 사람-친화 명칭 (SOURCES.md A-01~A-07 1:1 대조)
+DATA_GO_KR_DATASETS = {
+    "15057878": "교육부_커리어넷 대학학과정보",
+    "15058917": "교육부_커리어넷 학교정보",
+    "15056641": "교육부_커리어넷 직업정보",
+    "15057135": "교육부_커리어넷 진로자료",
+    "15116892": "KCUE 대학별 학과정보",
+    "15037507": "KCUE 대학알리미 대학 기본정보",
+    "15116816": "KCUE 대학 및 전문대학정보",
+}
+
 ONET_BASE_URL = "https://services.onetcenter.org/ws/"
+
+# 캐시 TTL (초)
+KR_CACHE_TTL_SEC = 24 * 3600         # 24 시간
+ONET_CACHE_TTL_SEC = 90 * 24 * 3600  # 90 일 (ONET 분기 갱신 주기)
 
 
 SETUP_GUIDE = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -104,7 +124,6 @@ def _save_keys(keys: dict) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(keys, f, ensure_ascii=False, indent=2)
     os.replace(tmp, KEYS_PATH)
-    # chmod 600 — owner read/write only
     try:
         os.chmod(KEYS_PATH, stat.S_IRUSR | stat.S_IWUSR)
     except OSError:
@@ -119,7 +138,6 @@ def check_api_keys() -> dict:
     missing: list[str] = []
     if not has_kr:
         missing.append("data_go_kr")
-    # onet은 선택이므로 missing이지만 가드 통과는 가능
     optional_missing: list[str] = []
     if not has_onet:
         optional_missing.append("onet")
@@ -151,7 +169,6 @@ def setup_api_key(name: Any, value: Any) -> dict:
     keys = _load_keys()
     keys[name] = value.strip()
     _save_keys(keys)
-    # 권한 확인
     mode = "unknown"
     try:
         st = os.stat(KEYS_PATH)
@@ -185,9 +202,7 @@ def validate_api_keys() -> dict:
     keys = _load_keys()
     result: dict = {"data_go_kr": None, "onet": None}
 
-    # data_go_kr ping — 커리어넷 학과정보 1건 호출 시도
     if keys.get("data_go_kr"):
-        # 커리어넷 학과정보 minimal call
         status, body = _http_get(
             "https://www.career.go.kr/cnet/openapi/getOpenApi",
             {
@@ -200,7 +215,6 @@ def validate_api_keys() -> dict:
                 "perPage": 1,
             },
         )
-        # 키 유효: HTTP 200 + 응답 본문에 'dataSearch' 또는 'totalCount'
         ok = status == 200 and ("dataSearch" in body or "totalCount" in body)
         result["data_go_kr"] = {
             "ok": ok,
@@ -208,10 +222,8 @@ def validate_api_keys() -> dict:
             "note": "200 + dataSearch/totalCount → valid" if ok else "키 무효 또는 활용신청 미완료. 안내 다시 확인.",
         }
 
-    # onet ping — Basic Auth로 occupation list 1건
     if keys.get("onet"):
         import base64
-        # ONET v2는 username:password 형식. 사용자가 입력한 키가 이미 그 형식이라고 가정.
         token = base64.b64encode(keys["onet"].encode("utf-8")).decode("ascii")
         url = ONET_BASE_URL + "online/occupations/15-1252.00/details"
         req = Request(
@@ -246,93 +258,272 @@ def validate_api_keys() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 1. 한국 데이터 호출 — 커리어넷·KCUE
+# 1. 캐시 — 결정론 파일 캐시 (TTL 검증)
+# ---------------------------------------------------------------------------
+
+def _cache_path(namespace: str, key: str) -> str:
+    safe_key = re.sub(r"[^A-Za-z0-9_.\-]", "_", key)[:120]
+    return os.path.join(CACHE_DIR, namespace, safe_key + ".json")
+
+
+def _cache_get(namespace: str, key: str, ttl_sec: int) -> Any:
+    p = _cache_path(namespace, key)
+    if not os.path.exists(p):
+        return None
+    try:
+        st = os.stat(p)
+    except OSError:
+        return None
+    if (time.time() - st.st_mtime) > ttl_sec:
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _cache_put(namespace: str, key: str, data: Any) -> str:
+    p = _cache_path(namespace, key)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, p)
+    return p
+
+
+def refresh_korean_data_cache(prune: Any = False) -> dict:
+    """한국 데이터 캐시 정리. prune=True 시 24h TTL 초과 항목 삭제."""
+    ns = os.path.join(CACHE_DIR, "kr")
+    pruned: list[str] = []
+    kept: list[str] = []
+    if os.path.isdir(ns):
+        now = time.time()
+        for fn in os.listdir(ns):
+            fp = os.path.join(ns, fn)
+            try:
+                age = now - os.stat(fp).st_mtime
+            except OSError:
+                continue
+            if age > KR_CACHE_TTL_SEC and (prune is True or str(prune).lower() in ("true", "1", "yes")):
+                try:
+                    os.remove(fp)
+                    pruned.append(fn)
+                except OSError:
+                    pass
+            else:
+                kept.append(fn)
+    return {
+        "ok": True,
+        "namespace": ns,
+        "ttl_sec": KR_CACHE_TTL_SEC,
+        "pruned": pruned,
+        "kept": kept,
+    }
+
+
+def refresh_onet_cache(prune: Any = False) -> dict:
+    """ONET 캐시 정리. prune=True 시 90일 TTL 초과 항목 삭제."""
+    ns = os.path.join(CACHE_DIR, "onet")
+    pruned: list[str] = []
+    kept: list[str] = []
+    if os.path.isdir(ns):
+        now = time.time()
+        for fn in os.listdir(ns):
+            fp = os.path.join(ns, fn)
+            try:
+                age = now - os.stat(fp).st_mtime
+            except OSError:
+                continue
+            if age > ONET_CACHE_TTL_SEC and (prune is True or str(prune).lower() in ("true", "1", "yes")):
+                try:
+                    os.remove(fp)
+                    pruned.append(fn)
+                except OSError:
+                    pass
+            else:
+                kept.append(fn)
+    return {
+        "ok": True,
+        "namespace": ns,
+        "ttl_sec": ONET_CACHE_TTL_SEC,
+        "pruned": pruned,
+        "kept": kept,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 2. 한국 데이터 호출 — 커리어넷·KCUE
 # ---------------------------------------------------------------------------
 
 def _require_kr_key() -> str | None:
     keys = _load_keys()
-    return keys.get("data_go_kr") if isinstance(keys.get("data_go_kr"), str) else None
+    v = keys.get("data_go_kr")
+    return v if isinstance(v, str) and v.strip() else None
 
 
-def kr_search_university(name: Any = None, region: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 학교정보 검색."""
+def _kr_career_call(svc_code: str, gubun: str, extra: dict | None = None, per_page: int = 10) -> dict:
+    """커리어넷 OpenAPI 단일 게이트웨이 호출 (캐시 통합)."""
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered. Run check_api_keys."}
+    per = max(1, min(int(per_page), 100))
     params = {
         "apiKey": key,
         "svcType": "api",
-        "svcCode": "SCHOOL",
+        "svcCode": svc_code,
         "contentType": "json",
-        "gubun": "univ_list",
+        "gubun": gubun,
         "thisPage": 1,
-        "perPage": max(1, min(int(per_page), 100)),
+        "perPage": per,
     }
-    if name and isinstance(name, str):
-        params["searchSchulNm"] = name.strip()
-    if region and isinstance(region, str):
-        params["region"] = region.strip()
+    if extra:
+        for k, v in extra.items():
+            if v is not None and str(v).strip():
+                params[k] = str(v).strip()
+    cache_key = svc_code + "_" + gubun + "_" + "_".join(f"{k}={v}" for k, v in sorted(params.items()) if k != "apiKey")
+    cached = _cache_get("kr", cache_key, KR_CACHE_TTL_SEC)
+    if cached is not None:
+        cached["from_cache"] = True
+        return cached
     status, body = _http_get("https://www.career.go.kr/cnet/openapi/getOpenApi", params)
-    return {
+    payload = {
         "ok": status == 200,
         "status": status,
         "raw": body[:5000] if body else "",
         "attribution": attribution_text(),
+        "from_cache": False,
     }
+    if payload["ok"]:
+        _cache_put("kr", cache_key, payload)
+    return payload
+
+
+def kr_search_university(name: Any = None, region: Any = None, per_page: int = 10) -> dict:
+    """커리어넷 학교정보 검색 (15058917)."""
+    return _kr_career_call("SCHOOL", "univ_list", {"searchSchulNm": name, "region": region}, per_page)
 
 
 def kr_search_major(keyword: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 학과정보 검색."""
-    key = _require_kr_key()
-    if not key:
-        return {"ok": False, "reason": "data_go_kr key not registered"}
-    params = {
-        "apiKey": key,
-        "svcType": "api",
-        "svcCode": "MAJOR",
-        "contentType": "json",
-        "gubun": "univ_list",
-        "thisPage": 1,
-        "perPage": max(1, min(int(per_page), 100)),
-    }
-    if keyword and isinstance(keyword, str):
-        params["searchMajorName"] = keyword.strip()
-    status, body = _http_get("https://www.career.go.kr/cnet/openapi/getOpenApi", params)
-    return {
-        "ok": status == 200,
-        "status": status,
-        "raw": body[:5000] if body else "",
-        "attribution": attribution_text(),
-    }
+    """커리어넷 학과정보 검색 (15057878)."""
+    return _kr_career_call("MAJOR", "univ_list", {"searchMajorName": keyword}, per_page)
 
 
 def kr_career_search(keyword: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 직업정보 검색."""
+    """커리어넷 직업정보 검색 (15056641)."""
+    return _kr_career_call("JOB", "job_dic_list", {"searchJobNm": keyword}, per_page)
+
+
+def kr_major_detail(major_seq: Any = None, keyword: Any = None) -> dict:
+    """커리어넷 학과 상세 (15057878). major_seq 또는 keyword로 조회."""
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered"}
+    if not (major_seq or keyword):
+        return {"ok": False, "reason": "major_seq 또는 keyword 중 하나 필요"}
+    extra: dict = {}
+    if major_seq:
+        extra["majorSeq"] = major_seq
+    if keyword:
+        extra["searchMajorName"] = keyword
+    return _kr_career_call("MAJOR", "univ_detail", extra, per_page=1)
+
+
+def kr_career_detail(career_seq: Any = None, keyword: Any = None) -> dict:
+    """커리어넷 직업 상세 (15056641). career_seq 또는 keyword."""
+    key = _require_kr_key()
+    if not key:
+        return {"ok": False, "reason": "data_go_kr key not registered"}
+    if not (career_seq or keyword):
+        return {"ok": False, "reason": "career_seq 또는 keyword 중 하나 필요"}
+    extra: dict = {}
+    if career_seq:
+        extra["seq"] = career_seq
+    if keyword:
+        extra["searchJobNm"] = keyword
+    return _kr_career_call("JOB", "job_dic_detail", extra, per_page=1)
+
+
+def kr_career_resources(keyword: Any = None, per_page: int = 10) -> dict:
+    """커리어넷 진로자료 (15057135) 검색."""
+    return _kr_career_call("CAREERINFO", "resource_list", {"searchTitle": keyword}, per_page)
+
+
+def kr_majors_by_university(univ_name: Any = None, per_page: int = 50) -> dict:
+    """KCUE 대학별 학과정보 (15116892) — 특정 대학의 학과 목록.
+    공공데이터포털 apis.data.go.kr 게이트웨이 호출."""
+    key = _require_kr_key()
+    if not key:
+        return {"ok": False, "reason": "data_go_kr key not registered"}
+    per = max(1, min(int(per_page), 100))
     params = {
-        "apiKey": key,
-        "svcType": "api",
-        "svcCode": "JOB",
-        "contentType": "json",
-        "gubun": "job_dic_list",
-        "thisPage": 1,
-        "perPage": max(1, min(int(per_page), 100)),
+        "serviceKey": key,
+        "pageNo": 1,
+        "numOfRows": per,
+        "type": "json",
     }
-    if keyword and isinstance(keyword, str):
-        params["searchJobNm"] = keyword.strip()
-    status, body = _http_get("https://www.career.go.kr/cnet/openapi/getOpenApi", params)
-    return {
+    if univ_name and isinstance(univ_name, str) and univ_name.strip():
+        params["schlKrnNm"] = univ_name.strip()
+    cache_key = "kcue_majors_" + (univ_name or "all")
+    cached = _cache_get("kr", cache_key, KR_CACHE_TTL_SEC)
+    if cached is not None:
+        cached["from_cache"] = True
+        return cached
+    status, body = _http_get(DATA_GO_KR_ENDPOINTS["15116892"], params)
+    payload = {
         "ok": status == 200,
         "status": status,
+        "endpoint": DATA_GO_KR_ENDPOINTS["15116892"],
         "raw": body[:5000] if body else "",
+        "attribution": attribution_text(),
+        "from_cache": False,
+        "dataset_id": "15116892",
+        "dataset_name": DATA_GO_KR_DATASETS["15116892"],
+    }
+    if payload["ok"]:
+        _cache_put("kr", cache_key, payload)
+    return payload
+
+
+def kr_university_by_region(region: Any = None, per_page: int = 50) -> dict:
+    """지역별 대학 — 커리어넷 학교정보 + KCUE 대학 기본정보 통합 (15058917 + 15037507)."""
+    if not region or not isinstance(region, str) or not region.strip():
+        return {"ok": False, "reason": "region required (예: 서울·경기·부산)"}
+    # 1차: 커리어넷 학교정보 region 파라미터
+    career = kr_search_university(name=None, region=region, per_page=per_page)
+    # 2차: KCUE 대학알리미 기본정보 (지역 필터)
+    key = _require_kr_key()
+    kcue_payload: dict = {"ok": False, "reason": "data_go_kr key not registered"}
+    if key:
+        per = max(1, min(int(per_page), 100))
+        params = {
+            "serviceKey": key,
+            "pageNo": 1,
+            "numOfRows": per,
+            "type": "json",
+            "schlSido": region.strip(),
+        }
+        status, body = _http_get(DATA_GO_KR_ENDPOINTS["15037507"], params)
+        kcue_payload = {
+            "ok": status == 200,
+            "status": status,
+            "endpoint": DATA_GO_KR_ENDPOINTS["15037507"],
+            "raw": body[:5000] if body else "",
+            "dataset_id": "15037507",
+            "dataset_name": DATA_GO_KR_DATASETS["15037507"],
+        }
+    return {
+        "ok": career.get("ok") or kcue_payload.get("ok"),
+        "region": region,
+        "career_net_school_info": career,
+        "kcue_univ_info": kcue_payload,
         "attribution": attribution_text(),
     }
 
 
 # ---------------------------------------------------------------------------
-# 2. ONET — 미국 직업 정보
+# 3. ONET — 미국 직업 정보
 # ---------------------------------------------------------------------------
 
 def _require_onet_key() -> str | None:
@@ -345,6 +536,10 @@ def _onet_get(path: str, timeout: float = 20.0) -> tuple[int, Any]:
     key = _require_onet_key()
     if not key:
         return -1, {"reason": "onet key not registered"}
+    cache_key = "onet_" + path
+    cached = _cache_get("onet", cache_key, ONET_CACHE_TTL_SEC)
+    if cached is not None:
+        return 200, cached
     import base64
     token = base64.b64encode(key.encode("utf-8")).decode("ascii")
     url = ONET_BASE_URL + path.lstrip("/")
@@ -363,6 +558,8 @@ def _onet_get(path: str, timeout: float = 20.0) -> tuple[int, Any]:
                 data = json.loads(body)
             except json.JSONDecodeError:
                 data = {"raw": body[:2000]}
+            if resp.status == 200:
+                _cache_put("onet", cache_key, data)
             return resp.status, data
     except Exception as e:
         return -1, {"reason": f"{type(e).__name__}: {e}"}
@@ -380,8 +577,13 @@ def onet_search_occupation(keyword: Any) -> dict:
     }
 
 
+# ONET-SOC 정규식. 공식 형식: NN-NNNN.NN (예: 15-1252.00 Software Developers).
+# 일부 코드는 분리 확장(예: 15-1252.01)이 존재하지만 NN-NNNN.NN 패턴은 유지된다.
+ONET_SOC_PATTERN = re.compile(r"^\d{2}-\d{4}\.\d{2}$")
+
+
 def onet_occupation_detail(soc_code: Any) -> dict:
-    if not isinstance(soc_code, str) or not re.match(r"^\d{2}-\d{4}\.\d{2}$", soc_code.strip()):
+    if not isinstance(soc_code, str) or not ONET_SOC_PATTERN.match(soc_code.strip()):
         return {"ok": False, "reason": "soc_code must be in format NN-NNNN.NN (e.g., 15-1252.00)"}
     status, data = _onet_get(f"online/occupations/{soc_code.strip()}/details")
     return {
@@ -392,14 +594,27 @@ def onet_occupation_detail(soc_code: Any) -> dict:
     }
 
 
-# Holland → ONET 매핑 (학계 표준)
+# Holland → ONET 매핑 (학계 표준).
+# ONET Interest Profiler가 채택한 RIASEC 6 영역 (Holland 1997 Making Vocational Choices 3rd ed.).
+# 각 코드별 ONET 검색 키워드는 ONET-SOC 분류에서 해당 interest area에 속하는 대표 직업명에서 추출.
+# 출처: SOURCES.md § C-01, C-02 + ONET Career One Stop.
 HOLLAND_ONET_KEYWORDS = {
-    "R": ["mechanic", "engineer", "technician", "agricultural", "construction"],
-    "I": ["scientist", "researcher", "analyst", "biologist", "physicist", "data"],
-    "A": ["artist", "designer", "musician", "writer", "actor", "creative"],
-    "S": ["teacher", "counselor", "social worker", "nurse", "therapist"],
+    "R": ["mechanic", "engineer", "technician", "agricultural", "construction", "carpenter"],
+    "I": ["scientist", "researcher", "analyst", "biologist", "physicist", "data", "statistician"],
+    "A": ["artist", "designer", "musician", "writer", "actor", "creative", "photographer"],
+    "S": ["teacher", "counselor", "social worker", "nurse", "therapist", "clergy"],
     "E": ["manager", "sales", "executive", "entrepreneur", "lawyer", "marketing"],
     "C": ["accountant", "auditor", "secretary", "clerk", "administrative", "bookkeeper"],
+}
+
+# Holland 코드 한글 명칭 (학계 표준 — Holland 1997 + 한국 직업능력연구원 STRONG 직업흥미검사)
+HOLLAND_KO_LABELS = {
+    "R": "현실형 (Realistic)",
+    "I": "탐구형 (Investigative)",
+    "A": "예술형 (Artistic)",
+    "S": "사회형 (Social)",
+    "E": "진취형 (Enterprising)",
+    "C": "관습형 (Conventional)",
 }
 
 
@@ -412,71 +627,129 @@ def holland_to_onet(code: Any) -> dict:
     return {
         "ok": True,
         "holland_code": c,
+        "holland_label_ko": HOLLAND_KO_LABELS[c],
         "search_keywords": keywords,
         "note": "각 키워드를 onet_search_occupation에 넣어 직업 후보를 받을 수 있음.",
         "attribution": onet_attribution_text(),
+        "source": "Holland 1997 + ONET Interest Profiler",
     }
 
 
 # ---------------------------------------------------------------------------
-# 3. 한↔영 학과명 매핑 사전 (시드)
+# 4. 한↔영 학과명 매핑 사전 (시드 — 70+ 항목)
 # ---------------------------------------------------------------------------
 
 KO_EN_MAJOR_DICT = {
+    # 공학
     "컴퓨터공학": "Computer Science",
     "컴퓨터과학": "Computer Science",
     "소프트웨어공학": "Software Engineering",
     "전자공학": "Electrical Engineering",
+    "전기공학": "Electrical Engineering",
     "기계공학": "Mechanical Engineering",
     "화학공학": "Chemical Engineering",
     "산업공학": "Industrial Engineering",
     "건축학": "Architecture",
     "건축공학": "Architectural Engineering",
     "토목공학": "Civil Engineering",
+    "환경공학": "Environmental Engineering",
+    "정보통신공학": "Information & Communication Engineering",
+    "재료공학": "Materials Engineering",
+    "신소재공학": "Materials Science & Engineering",
+    "자동차공학": "Automotive Engineering",
+    "조선해양공학": "Naval Architecture & Ocean Engineering",
+    "항공우주공학": "Aerospace Engineering",
+    "원자력공학": "Nuclear Engineering",
+    "생명공학": "Bioengineering",
+    "바이오공학": "Biotechnology",
+    # 자연과학
     "수학": "Mathematics",
     "통계학": "Statistics",
     "물리학": "Physics",
     "화학": "Chemistry",
     "생물학": "Biology",
+    "지구과학": "Earth Science",
+    "지질학": "Geology",
+    "천문학": "Astronomy",
+    "해양학": "Oceanography",
+    "지리학": "Geography",
+    # 사회과학·인문학
     "심리학": "Psychology",
     "사회학": "Sociology",
+    "인류학": "Anthropology",
     "경영학": "Business Administration",
     "경제학": "Economics",
     "회계학": "Accounting",
+    "재무학": "Finance",
     "법학": "Law",
     "정치외교학": "Political Science",
     "행정학": "Public Administration",
+    "국제관계학": "International Relations",
     "국어국문학": "Korean Language & Literature",
     "영어영문학": "English Language & Literature",
+    "중어중문학": "Chinese Language & Literature",
+    "일어일문학": "Japanese Language & Literature",
+    "독어독문학": "German Language & Literature",
+    "불어불문학": "French Language & Literature",
     "역사학": "History",
+    "사학": "History",
     "철학": "Philosophy",
+    "고고학": "Archaeology",
+    # 신학·종교
     "신학": "Theology",
     "기독교학": "Christian Studies",
-    "사회복지학": "Social Welfare",
-    "교육학": "Education",
+    "종교학": "Religious Studies",
+    # 의약·보건
     "의학": "Medicine",
-    "간호학": "Nursing",
+    "한의학": "Korean Medicine",
     "치의학": "Dentistry",
     "약학": "Pharmacy",
     "수의학": "Veterinary Medicine",
+    "간호학": "Nursing",
+    "물리치료학": "Physical Therapy",
+    "임상병리학": "Medical Laboratory Science",
+    "방사선학": "Radiologic Science",
+    "보건학": "Public Health",
+    # 사회복지·교육
+    "사회복지학": "Social Welfare",
+    "교육학": "Education",
+    "유아교육학": "Early Childhood Education",
+    "초등교육학": "Elementary Education",
+    "특수교육학": "Special Education",
+    # 예술·체육
     "디자인": "Design",
     "시각디자인": "Visual Design",
     "산업디자인": "Industrial Design",
+    "패션디자인": "Fashion Design",
     "음악": "Music",
+    "성악": "Vocal Music",
+    "작곡": "Composition",
     "미술": "Fine Arts",
+    "회화": "Painting",
+    "조소": "Sculpture",
+    "사진학": "Photography",
+    "연극영화학": "Theater & Film",
+    "무용": "Dance",
     "체육학": "Physical Education",
+    "스포츠과학": "Sports Science",
+    # 농수산·식품
     "식품영양학": "Food and Nutrition",
+    "식품공학": "Food Science & Technology",
     "농학": "Agriculture",
+    "원예학": "Horticulture",
     "임학": "Forestry",
-    "해양학": "Oceanography",
-    "지리학": "Geography",
-    "환경공학": "Environmental Engineering",
-    "정보통신공학": "Information & Communication Engineering",
+    "축산학": "Animal Science",
+    "수산학": "Fisheries Science",
+    # 첨단·신생
     "데이터사이언스": "Data Science",
     "인공지능": "Artificial Intelligence",
+    "빅데이터": "Big Data",
+    "사이버보안": "Cybersecurity",
+    # 미디어
     "미디어커뮤니케이션": "Media & Communication",
     "신문방송학": "Journalism & Broadcasting",
     "광고홍보학": "Advertising & Public Relations",
+    "언론정보학": "Communication & Information",
 }
 
 
@@ -489,7 +762,6 @@ def ko_en_major_dict(ko: Any = None) -> dict:
     k = ko.strip()
     if k in KO_EN_MAJOR_DICT:
         return {"ok": True, "ko": k, "en": KO_EN_MAJOR_DICT[k]}
-    # 부분 매칭
     matches = {key: val for key, val in KO_EN_MAJOR_DICT.items() if k in key or key in k}
     if matches:
         return {"ok": True, "ko": k, "partial_matches": matches}
@@ -507,7 +779,6 @@ def major_to_onet(ko_major: Any) -> dict:
             "reason": f"한국 학과명 '{ko_major}' → 영문 매핑 사전에 없음. ko_en_major_dict 시드에 추가 필요.",
         }
     en = mapping.get("en") or list((mapping.get("partial_matches") or {}).values())[0]
-    # ONET 검색 호출 (키 있을 때만)
     search_result = onet_search_occupation(en) if _require_onet_key() else {
         "ok": False, "reason": "onet key not registered — 한↔영 매핑만 반환",
     }
@@ -520,8 +791,47 @@ def major_to_onet(ko_major: Any) -> dict:
     }
 
 
+def cross_reference_major_career(ko_major: Any) -> dict:
+    """한국 학과 → 한국 직업 (커리어넷) + ONET 직업 (한↔영 매핑) 통합 조회.
+    결정론 결합 — LLM 추론으로 직업명 만들어내는 것 차단."""
+    if not isinstance(ko_major, str) or not ko_major.strip():
+        return {"ok": False, "reason": "ko_major required"}
+    m = ko_major.strip()
+    # 1) 한↔영 매핑
+    mapping = ko_en_major_dict(m)
+    en = None
+    if mapping.get("ok") and mapping.get("en"):
+        en = mapping["en"]
+    elif mapping.get("partial_matches"):
+        en = list(mapping["partial_matches"].values())[0]
+    # 2) 한국 학과 검색 (커리어넷)
+    kr_major_result = kr_search_major(m) if _require_kr_key() else {
+        "ok": False, "reason": "data_go_kr key not registered"
+    }
+    # 3) 한국 직업 검색 (커리어넷, 학과 키워드로 직업 후보)
+    kr_career_result = kr_career_search(m) if _require_kr_key() else {
+        "ok": False, "reason": "data_go_kr key not registered"
+    }
+    # 4) ONET 직업 검색
+    onet_result: dict = {"ok": False, "reason": "no en mapping"}
+    if en and _require_onet_key():
+        onet_result = onet_search_occupation(en)
+    elif en:
+        onet_result = {"ok": False, "reason": "onet key not registered", "en_major": en}
+    return {
+        "ok": True,
+        "ko_major": m,
+        "en_major": en,
+        "kr_major_info": kr_major_result,
+        "kr_career_candidates": kr_career_result,
+        "onet_occupations": onet_result,
+        "kr_attribution": attribution_text(),
+        "onet_attribution": onet_attribution_text() if en else None,
+    }
+
+
 # ---------------------------------------------------------------------------
-# 4. Attribution 자동 생성 (할루시네이션 차단)
+# 5. Attribution 자동 생성 (할루시네이션 차단)
 # ---------------------------------------------------------------------------
 
 def attribution_text() -> dict:
@@ -529,6 +839,7 @@ def attribution_text() -> dict:
     return {
         "rendered": "출처: 공공데이터포털 (data.go.kr) — 교육부 커리어넷 + 한국대학교육협의회(KCUE) 대학알리미.",
         "source": "data.go.kr",
+        "license": "공공누리 제1유형 (출처 표시)",
         "datasets": [
             "15057878 교육부_커리어넷 대학학과정보",
             "15058917 교육부_커리어넷 학교정보",
@@ -569,28 +880,42 @@ def validate_attribution_present(text: Any) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 5. SYNC 검증
+# 6. SYNC 검증
 # ---------------------------------------------------------------------------
 
 def validate_api_endpoints_sync() -> dict:
     """등록된 endpoint URL 7+1개 형식 검증 (도메인·경로 무결성)."""
     expected_kr_count = 7
     actual_kr = len(DATA_GO_KR_ENDPOINTS)
+    expected_ids = {"15057878", "15058917", "15056641", "15057135", "15116892", "15037507", "15116816"}
+    actual_ids = set(DATA_GO_KR_ENDPOINTS.keys())
+    missing_ids = expected_ids - actual_ids
+    extra_ids = actual_ids - expected_ids
     invalid: list[str] = []
     for ds_id, url in DATA_GO_KR_ENDPOINTS.items():
         if not url.startswith("https://"):
             invalid.append(f"{ds_id}: not HTTPS")
+        if " " in url:
+            invalid.append(f"{ds_id}: whitespace in URL")
     return {
-        "ok": actual_kr == expected_kr_count and not invalid,
+        "ok": (
+            actual_kr == expected_kr_count
+            and not invalid
+            and not missing_ids
+            and not extra_ids
+            and ONET_BASE_URL.startswith("https://")
+        ),
         "expected_kr": expected_kr_count,
         "actual_kr": actual_kr,
+        "missing_dataset_ids": sorted(missing_ids),
+        "extra_dataset_ids": sorted(extra_ids),
         "invalid_urls": invalid,
         "onet_base": ONET_BASE_URL,
     }
 
 
 # ---------------------------------------------------------------------------
-# CLI
+# 7. CLI
 # ---------------------------------------------------------------------------
 
 def _bool_arg(s: Any) -> bool:
@@ -624,6 +949,26 @@ def main() -> int:
     p.add_argument("--keyword", default=None)
     p.add_argument("--per-page", type=int, default=10, dest="per_page")
 
+    p = sub.add_parser("kr_major_detail")
+    p.add_argument("--major-seq", default=None, dest="major_seq")
+    p.add_argument("--keyword", default=None)
+
+    p = sub.add_parser("kr_career_detail")
+    p.add_argument("--career-seq", default=None, dest="career_seq")
+    p.add_argument("--keyword", default=None)
+
+    p = sub.add_parser("kr_career_resources")
+    p.add_argument("--keyword", default=None)
+    p.add_argument("--per-page", type=int, default=10, dest="per_page")
+
+    p = sub.add_parser("kr_majors_by_university")
+    p.add_argument("--univ-name", default=None, dest="univ_name")
+    p.add_argument("--per-page", type=int, default=50, dest="per_page")
+
+    p = sub.add_parser("kr_university_by_region")
+    p.add_argument("--region", required=True)
+    p.add_argument("--per-page", type=int, default=50, dest="per_page")
+
     p = sub.add_parser("onet_search_occupation")
     p.add_argument("--keyword", required=True)
 
@@ -639,8 +984,17 @@ def main() -> int:
     p = sub.add_parser("major_to_onet")
     p.add_argument("--ko-major", required=True, dest="ko_major")
 
+    p = sub.add_parser("cross_reference_major_career")
+    p.add_argument("--ko-major", required=True, dest="ko_major")
+
     p = sub.add_parser("validate_attribution_present")
     p.add_argument("--text", required=True)
+
+    p = sub.add_parser("refresh_korean_data_cache")
+    p.add_argument("--prune", default="false")
+
+    p = sub.add_parser("refresh_onet_cache")
+    p.add_argument("--prune", default="false")
 
     args = parser.parse_args()
     cmd = args.cmd
@@ -657,6 +1011,16 @@ def main() -> int:
         out = kr_search_major(args.keyword, args.per_page)
     elif cmd == "kr_career_search":
         out = kr_career_search(args.keyword, args.per_page)
+    elif cmd == "kr_major_detail":
+        out = kr_major_detail(args.major_seq, args.keyword)
+    elif cmd == "kr_career_detail":
+        out = kr_career_detail(args.career_seq, args.keyword)
+    elif cmd == "kr_career_resources":
+        out = kr_career_resources(args.keyword, args.per_page)
+    elif cmd == "kr_majors_by_university":
+        out = kr_majors_by_university(args.univ_name, args.per_page)
+    elif cmd == "kr_university_by_region":
+        out = kr_university_by_region(args.region, args.per_page)
     elif cmd == "onet_search_occupation":
         out = onet_search_occupation(args.keyword)
     elif cmd == "onet_occupation_detail":
@@ -667,6 +1031,8 @@ def main() -> int:
         out = ko_en_major_dict(args.ko)
     elif cmd == "major_to_onet":
         out = major_to_onet(args.ko_major)
+    elif cmd == "cross_reference_major_career":
+        out = cross_reference_major_career(args.ko_major)
     elif cmd == "attribution_text":
         out = attribution_text()
     elif cmd == "onet_attribution_text":
@@ -675,6 +1041,10 @@ def main() -> int:
         out = validate_attribution_present(args.text)
     elif cmd == "validate_api_endpoints_sync":
         out = validate_api_endpoints_sync()
+    elif cmd == "refresh_korean_data_cache":
+        out = refresh_korean_data_cache(_bool_arg(args.prune))
+    elif cmd == "refresh_onet_cache":
+        out = refresh_onet_cache(_bool_arg(args.prune))
     else:
         parser.error(f"unknown command: {cmd}")
         return 2
