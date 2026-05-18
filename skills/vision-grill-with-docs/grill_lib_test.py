@@ -578,6 +578,141 @@ def test_validate_ldr_chain():
 # 25. scenario_expand 주제 치환
 # ---------------------------------------------------------------------------
 
+def test_route_intake():
+    """E안 마스터 진입 — 한 문장 자유 답 → 진입 스킬 라우팅."""
+    # 빈 입력 → 메뉴
+    out = grill_lib.route_intake("")
+    expect("intake 빈 입력 → menu", out["mode"] == "menu" and "guidance" in out)
+    expect("intake guidance 예시 포함", "처음입니다" in out["guidance"])
+
+    # 박사님 본인
+    out = grill_lib.route_intake("박사님 본인 미래학자 본업 5년 집중")
+    expect("intake 박사님 본인 → Mode A", out["mode"] == "A")
+    expect("intake 박사님 본인 → mission-frame", out["next_skill"] == "vision-mission-frame")
+
+    # 진학·학교 키워드는 career 영역으로 라우팅 (현실적·정확)
+    out = grill_lib.route_intake("신학교 진학 결단 앞두고 가족이 반대")
+    expect("intake 결단 → Mode C", out["mode"] == "C")
+    expect("intake 진학 키워드 → school-major-info (career 영역)",
+           out["next_skill"] == "vision-school-major-info")
+
+    # 순수 사역 영역 → mission-frame
+    out = grill_lib.route_intake("선교 헌신·전임 사역 결단")
+    expect("intake 순수 사역 → mission-frame", out["next_skill"] == "vision-mission-frame")
+
+    # 영역 명시 없는 큰 결정 → stuck_decision으로 grill-with-docs
+    out = grill_lib.route_intake("큰 결정 앞에서 막혔어요")
+    expect("intake 영역 모호 결정 → grill-with-docs", out["next_skill"] == "vision-grill-with-docs")
+
+    # 진로 영역
+    out = grill_lib.route_intake("진로·전공·학교 결정해야 합니다")
+    expect("intake 진로 → school-major-info", out["next_skill"] == "vision-school-major-info")
+
+    # 재정 영역
+    out = grill_lib.route_intake("재정 큰 결정 — 집 매수 고민")
+    expect("intake 재정 → financial-3shields", out["next_skill"] == "vision-financial-3shields-3windows")
+
+    # 첫 입장 (박사님 책 공식 진단부터)
+    out = grill_lib.route_intake("처음입니다 어디서부터 시작해야 할지")
+    expect("intake 첫 입장 → cys-competence", out["next_skill"] == "vision-cys-competence-visioncoding")
+
+    # 미래 시뮬레이션
+    out = grill_lib.route_intake("5년 후 10년 후 미래 모습 시뮬레이션")
+    expect("intake 미래 → futures-timeline-map", out["next_skill"] == "vision-futures-timeline-map")
+
+    # 사역 헌신
+    out = grill_lib.route_intake("선교사 헌신을 앞두고 있어요")
+    # career·ministry·stuck_decision 다 매칭 가능 — stuck_decision이 우선
+    expect("intake 사역 헌신 매칭", len(out["matched_categories"]) >= 1)
+
+    # 매칭 없음 → 기본 Mode C
+    out = grill_lib.route_intake("아무거나 외계어 zzz")
+    expect("intake 매칭 없음 → Mode C 기본", out["mode"] == "C")
+
+
+def test_decide_first_skill():
+    # 첫 회·진단 없음 → 박사님 공식 입학 진단
+    out = grill_lib.decide_first_skill({"visit_count": 1, "has_diagnosis": False})
+    expect("first_skill 첫 회 → cys-competence",
+           out["first_skill"] == "vision-cys-competence-visioncoding")
+    expect("first_skill depth shallow_first", out["depth_mode"] == "shallow_first")
+
+    # 진단 있고 비전 없음
+    out = grill_lib.decide_first_skill({"visit_count": 2, "has_diagnosis": True, "has_vision_statement": False})
+    expect("first_skill 진단 후 비전 없음 → clarity-coaching",
+           out["first_skill"] == "vision-clarity-coaching")
+
+    # 비전 있음·단계 5
+    out = grill_lib.decide_first_skill({
+        "visit_count": 3, "has_diagnosis": True, "has_vision_statement": True, "current_stage": 5
+    })
+    expect("first_skill 5단계 → mission-frame", out["first_skill"] == "vision-mission-frame")
+    expect("first_skill 반복 사용자 → deep_grill", out["depth_mode"] == "deep_grill")
+
+    # 비전 있음·단계 8
+    out = grill_lib.decide_first_skill({
+        "visit_count": 5, "has_diagnosis": True, "has_vision_statement": True, "current_stage": 8
+    })
+    expect("first_skill 8단계 → five-stages", out["first_skill"] == "vision-five-stages")
+
+    # 빈 입력
+    out = grill_lib.decide_first_skill(None)
+    expect("first_skill None → 기본 권장", out["first_skill"] == "vision-cys-competence-visioncoding")
+
+
+def test_track_user_state():
+    """사용자 상태 추적 — isolated temp file."""
+    saved = grill_lib.USER_STATE_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        grill_lib.USER_STATE_PATH = os.path.join(tmp, "user_state.json")
+        try:
+            # read — 빈 상태
+            out = grill_lib.track_user_state("read")
+            expect("track read 초기 상태", out["ok"] and out["state"]["visit_count"] == 0)
+
+            # increment_visit
+            out = grill_lib.track_user_state("increment_visit")
+            expect("track increment 1차", out["state"]["visit_count"] == 1)
+            out = grill_lib.track_user_state("increment_visit")
+            expect("track increment 2차", out["state"]["visit_count"] == 2)
+
+            # mark_completed (진단 스킬)
+            out = grill_lib.track_user_state("mark_completed", skill="vision-cys-competence-visioncoding")
+            expect("track 진단 스킬 mark → has_diagnosis=True", out["state"]["has_diagnosis"] is True)
+            expect("track 진단 스킬 mark → completed 포함",
+                   "vision-cys-competence-visioncoding" in out["state"]["completed_skills"])
+
+            # mark_completed (일반 스킬)
+            out = grill_lib.track_user_state("mark_completed", skill="vision-clarity-coaching")
+            expect("track 일반 스킬 mark", "vision-clarity-coaching" in out["state"]["completed_skills"])
+
+            # set_vision_statement
+            out = grill_lib.track_user_state("set_vision_statement")
+            expect("track 비전 선언문 설정", out["state"]["has_vision_statement"] is True)
+
+            # set_stage
+            out = grill_lib.track_user_state("set_stage", stage=5)
+            expect("track 단계 5 설정", out["state"]["current_stage"] == 5)
+            # 범위 밖 → clip
+            out = grill_lib.track_user_state("set_stage", stage=99)
+            expect("track 단계 99 → 8로 clip", out["state"]["current_stage"] == 8)
+
+            # 잘못된 action
+            out = grill_lib.track_user_state("unknown_action")
+            expect("track 잘못된 action 차단", not out["ok"])
+
+            # mark_completed 빈 skill
+            out = grill_lib.track_user_state("mark_completed", skill="")
+            expect("track 빈 skill 차단", not out["ok"])
+
+            # reset
+            out = grill_lib.track_user_state("reset")
+            expect("track reset visit_count=0",
+                   out["state"]["visit_count"] == 0 and not out["state"]["has_diagnosis"])
+        finally:
+            grill_lib.USER_STATE_PATH = saved
+
+
 def test_scenario_expand_topic_inject():
     out = grill_lib.scenario_expand("강남 아파트 매도")
     expect("scenario 주제 치환 5년", "강남 아파트 매도" in out["scenarios"][0]["prompt"])
@@ -620,6 +755,9 @@ def main() -> int:
     test_seed_standard_glossary()
     test_validate_context_integrity()
     test_validate_ldr_chain()
+    test_route_intake()
+    test_decide_first_skill()
+    test_track_user_state()
     test_scenario_expand_topic_inject()
 
     total = PASS + FAIL

@@ -52,9 +52,10 @@ DATA_GO_KR_ENDPOINTS = {
     "15058917": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 학교정보
     "15056641": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 직업정보
     "15057135": "https://www.career.go.kr/cnet/openapi/getOpenApi",   # 커리어넷 진로자료
-    "15116892": "https://apis.data.go.kr/B552103/UnivMajorInfoService/getUnivMajorInfo",
-    "15037507": "https://apis.data.go.kr/B552103/HEducationInfoService/getUnivInfo",
-    "15116816": "https://apis.data.go.kr/B552103/UnivInfoService/getUnivInfo",
+    # KCUE 3개: academyinfo.go.kr 게이트웨이 (data.go.kr 공식 명세 인용·라이브 검증).
+    "15116892": "http://openapi.academyinfo.go.kr/openapi/service/rest/SchoolMajorInfoService/getSchoolMajorInfo",
+    "15037507": "http://openapi.academyinfo.go.kr/openapi/service/rest/BasicInformationService/getComparisonPubYear",
+    "15116816": "http://openapi.academyinfo.go.kr/openapi/service/rest/SchoolInfoService/getSchoolInfo",
 }
 
 # 데이터셋 ID → 사람-친화 명칭 (SOURCES.md A-01~A-07 1:1 대조)
@@ -83,16 +84,19 @@ vision-school-major-info — API 키 등록 안내
 
 【필수】 공공데이터포털 (data.go.kr) — 한국 7개 API 통합
   1) https://www.data.go.kr 회원가입 (무료)
-  2) 다음 7개 API "활용신청" (각각 자동승인·즉시 사용 가능):
+  2) 다음 7개 API에 *각각* "활용신청" 클릭 (자동승인·즉시~수시간 후 사용 가능).
+     API마다 별도 활용신청이 필요 — 한 번에 7개 모두 신청해야 풀가동.
      · 15057878 교육부_커리어넷 대학학과정보
      · 15058917 교육부_커리어넷 학교정보
      · 15056641 교육부_커리어넷 직업정보
      · 15057135 교육부_커리어넷 진로자료
-     · 15116892 KCUE 대학별 학과정보
-     · 15037507 KCUE 대학알리미 대학 기본정보
-     · 15116816 KCUE 대학 및 전문대학정보
-  3) 마이페이지 → 개발계정 → 일반 인증키(Encoding) 복사
+     · 15116892 KCUE 대학별 학과정보 ← KCUE 그룹·별도 신청 필수
+     · 15037507 KCUE 대학알리미 대학 기본정보 ← KCUE 그룹·별도 신청 필수
+     · 15116816 KCUE 대학 및 전문대학정보 ← KCUE 그룹·별도 신청 필수
+  3) 마이페이지 → 개발계정 → 일반 인증키(Encoding) 복사 (7개 API 동일 키)
   4) python3 school_major_lib.py setup_api_key --name data_go_kr --value "복사한_키"
+  ※ 활용신청 안 한 API 호출 시: "SERVICE KEY IS NOT REGISTERED ERROR"
+     → 본 스킬이 해당 데이터셋 ID와 활용신청 URL을 자동 안내 (activation_guide 필드)
 
 【선택】 ONET Web Services v2.0 — 미국 직업 (유학·해외 진로용)
   1) https://services.onetcenter.org/developer/signup 회원가입
@@ -364,8 +368,9 @@ def _require_kr_key() -> str | None:
     return v if isinstance(v, str) and v.strip() else None
 
 
-def _kr_career_call(svc_code: str, gubun: str, extra: dict | None = None, per_page: int = 10) -> dict:
-    """커리어넷 OpenAPI 단일 게이트웨이 호출 (캐시 통합)."""
+def _kr_career_call(svc_code: str, gubun: str | None, extra: dict | None = None, per_page: int = 10) -> dict:
+    """커리어넷 OpenAPI 단일 게이트웨이 호출 (캐시 통합).
+    gubun=None인 경우 파라미터에서 제외 (MAJOR_VIEW·JOB_VIEW·COSE처럼 gubun 없는 호출 지원)."""
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered. Run check_api_keys."}
@@ -375,15 +380,16 @@ def _kr_career_call(svc_code: str, gubun: str, extra: dict | None = None, per_pa
         "svcType": "api",
         "svcCode": svc_code,
         "contentType": "json",
-        "gubun": gubun,
         "thisPage": 1,
         "perPage": per,
     }
+    if gubun:
+        params["gubun"] = gubun
     if extra:
         for k, v in extra.items():
             if v is not None and str(v).strip():
                 params[k] = str(v).strip()
-    cache_key = svc_code + "_" + gubun + "_" + "_".join(f"{k}={v}" for k, v in sorted(params.items()) if k != "apiKey")
+    cache_key = svc_code + "_" + (gubun or "_") + "_" + "_".join(f"{k}={v}" for k, v in sorted(params.items()) if k != "apiKey")
     cached = _cache_get("kr", cache_key, KR_CACHE_TTL_SEC)
     if cached is not None:
         cached["from_cache"] = True
@@ -401,9 +407,45 @@ def _kr_career_call(svc_code: str, gubun: str, extra: dict | None = None, per_pa
     return payload
 
 
+REGION_NAME_MAP = {
+    "서울": "서울특별시", "서울시": "서울특별시", "서울특별시": "서울특별시",
+    "부산": "부산광역시", "부산시": "부산광역시", "부산광역시": "부산광역시",
+    "대구": "대구광역시", "대구시": "대구광역시", "대구광역시": "대구광역시",
+    "인천": "인천광역시", "인천시": "인천광역시", "인천광역시": "인천광역시",
+    "광주": "광주광역시", "광주시": "광주광역시", "광주광역시": "광주광역시",
+    "대전": "대전광역시", "대전시": "대전광역시", "대전광역시": "대전광역시",
+    "울산": "울산광역시", "울산시": "울산광역시", "울산광역시": "울산광역시",
+    "세종": "세종특별자치시", "세종시": "세종특별자치시", "세종특별자치시": "세종특별자치시",
+    "경기": "경기도", "경기도": "경기도",
+    "강원": "강원특별자치도", "강원도": "강원특별자치도", "강원특별자치도": "강원특별자치도",
+    "충북": "충청북도", "충청북도": "충청북도",
+    "충남": "충청남도", "충청남도": "충청남도",
+    "전북": "전북특별자치도", "전라북도": "전북특별자치도", "전북특별자치도": "전북특별자치도",
+    "전남": "전라남도", "전라남도": "전라남도",
+    "경북": "경상북도", "경상북도": "경상북도",
+    "경남": "경상남도", "경상남도": "경상남도",
+    "제주": "제주특별자치도", "제주도": "제주특별자치도", "제주특별자치도": "제주특별자치도",
+}
+
+
+def normalize_region(region: Any) -> str | None:
+    """지역명을 커리어넷 SCHOOL API 표준 행정구역명으로 정규화 (결정론).
+    예: '경기' → '경기도', '서울' → '서울특별시'. 매칭 안 되면 입력 그대로 반환."""
+    if not isinstance(region, str) or not region.strip():
+        return None
+    r = region.strip()
+    return REGION_NAME_MAP.get(r, r)
+
+
 def kr_search_university(name: Any = None, region: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 학교정보 검색 (15058917)."""
-    return _kr_career_call("SCHOOL", "univ_list", {"searchSchulNm": name, "region": region}, per_page)
+    """커리어넷 학교정보 검색 (15058917).
+    실측 region 파라미터: searchRegion (region 아님). 값은 정식 행정구역명."""
+    region_norm = normalize_region(region) if region else None
+    return _kr_career_call(
+        "SCHOOL", "univ_list",
+        {"searchSchulNm": name, "searchRegion": region_norm},
+        per_page,
+    )
 
 
 def kr_search_major(keyword: Any = None, per_page: int = 10) -> dict:
@@ -417,109 +459,140 @@ def kr_career_search(keyword: Any = None, per_page: int = 10) -> dict:
 
 
 def kr_major_detail(major_seq: Any = None, keyword: Any = None) -> dict:
-    """커리어넷 학과 상세 (15057878). major_seq 또는 keyword로 조회."""
+    """커리어넷 학과 상세 (15057878). major_seq 필요.
+    keyword만 주어진 경우 학과 검색 후 majorSeq 추출 → 상세 조회로 자동 연쇄.
+    실측 svcCode: MAJOR_VIEW (-5 majorSeq 없습니다 응답으로 검증)."""
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered"}
     if not (major_seq or keyword):
         return {"ok": False, "reason": "major_seq 또는 keyword 중 하나 필요"}
-    extra: dict = {}
-    if major_seq:
-        extra["majorSeq"] = major_seq
-    if keyword:
-        extra["searchMajorName"] = keyword
-    return _kr_career_call("MAJOR", "univ_detail", extra, per_page=1)
+    if not major_seq and keyword:
+        listing = kr_search_major(keyword, per_page=1)
+        if not listing.get("ok"):
+            return listing
+        raw = listing.get("raw", "")
+        m = re.search(r'"majorSeq"\s*:\s*"?(\d+)"?', raw)
+        if not m:
+            return {"ok": False, "reason": f"keyword '{keyword}'로 학과 검색 결과 없음", "search_raw": raw[:500]}
+        major_seq = m.group(1)
+    return _kr_career_call("MAJOR_VIEW", None, {"majorSeq": str(major_seq)}, per_page=1)
 
 
 def kr_career_detail(career_seq: Any = None, keyword: Any = None) -> dict:
-    """커리어넷 직업 상세 (15056641). career_seq 또는 keyword."""
+    """커리어넷 직업 상세 (15056641). jobdicSeq 필요.
+    keyword만 주어진 경우 직업 검색 후 jobdicSeq 추출 → 상세 조회로 자동 연쇄.
+    실측 svcCode: JOB_VIEW (-5 jobdicSeq가 없습니다 응답으로 검증)."""
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered"}
     if not (career_seq or keyword):
-        return {"ok": False, "reason": "career_seq 또는 keyword 중 하나 필요"}
-    extra: dict = {}
-    if career_seq:
-        extra["seq"] = career_seq
-    if keyword:
-        extra["searchJobNm"] = keyword
-    return _kr_career_call("JOB", "job_dic_detail", extra, per_page=1)
+        return {"ok": False, "reason": "career_seq(jobdicSeq) 또는 keyword 중 하나 필요"}
+    if not career_seq and keyword:
+        listing = kr_career_search(keyword, per_page=1)
+        if not listing.get("ok"):
+            return listing
+        raw = listing.get("raw", "")
+        m = re.search(r'"jobdicSeq"\s*:\s*"?(\d+)"?', raw) or re.search(r'"seq"\s*:\s*"?(\d+)"?', raw)
+        if not m:
+            return {"ok": False, "reason": f"keyword '{keyword}'로 직업 검색 결과 없음", "search_raw": raw[:500]}
+        career_seq = m.group(1)
+    return _kr_career_call("JOB_VIEW", None, {"jobdicSeq": str(career_seq)}, per_page=1)
 
 
 def kr_career_resources(keyword: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 진로자료 (15057135) 검색."""
-    return _kr_career_call("CAREERINFO", "resource_list", {"searchTitle": keyword}, per_page)
+    """커리어넷 진로자료 (15057135) 검색.
+    실측 svcCode: COSE (커리어넷 공식 가이드 + 200 OK + dataSearch.content 검증)."""
+    return _kr_career_call("COSE", None, {"searchTitle": keyword}, per_page)
 
 
-def kr_majors_by_university(univ_name: Any = None, per_page: int = 50) -> dict:
+def _kcue_response_status(raw: str) -> dict:
+    """KCUE XML 응답에서 resultCode·resultMsg를 결정론 추출.
+    SERVICE KEY IS NOT REGISTERED ERROR(99) 등 비즈니스 오류를 정확히 식별."""
+    code_match = re.search(r"<resultCode>\s*([^<]+?)\s*</resultCode>", raw or "")
+    msg_match = re.search(r"<resultMsg>\s*([^<]+?)\s*</resultMsg>", raw or "")
+    code = code_match.group(1) if code_match else ""
+    msg = msg_match.group(1) if msg_match else ""
+    return {
+        "result_code": code,
+        "result_msg": msg,
+        "business_ok": code == "00",
+        "key_not_registered": "SERVICE KEY IS NOT REGISTERED" in (msg or "").upper(),
+    }
+
+
+def kr_majors_by_university(univ_name: Any = None, svy_yr: Any = None, per_page: int = 50) -> dict:
     """KCUE 대학별 학과정보 (15116892) — 특정 대학의 학과 목록.
-    공공데이터포털 apis.data.go.kr 게이트웨이 호출."""
+    필수 파라미터(공식 명세): serviceKey·svyYr·schlKrnNm. 응답: XML."""
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered"}
-    per = max(1, min(int(per_page), 100))
+    if not univ_name or not isinstance(univ_name, str) or not univ_name.strip():
+        return {"ok": False, "reason": "univ_name 필수 (예: '연세대학교')"}
+    per = max(1, min(int(per_page), 999))
+    yr = str(svy_yr).strip() if svy_yr else str(_default_svy_yr())
     params = {
         "serviceKey": key,
+        "svyYr": yr,
+        "schlKrnNm": univ_name.strip(),
         "pageNo": 1,
         "numOfRows": per,
-        "type": "json",
     }
-    if univ_name and isinstance(univ_name, str) and univ_name.strip():
-        params["schlKrnNm"] = univ_name.strip()
-    cache_key = "kcue_majors_" + (univ_name or "all")
+    cache_key = f"kcue_majors_{univ_name}_{yr}"
     cached = _cache_get("kr", cache_key, KR_CACHE_TTL_SEC)
     if cached is not None:
         cached["from_cache"] = True
         return cached
     status, body = _http_get(DATA_GO_KR_ENDPOINTS["15116892"], params)
+    biz = _kcue_response_status(body)
+    ok = status == 200 and biz["business_ok"]
     payload = {
-        "ok": status == 200,
+        "ok": ok,
         "status": status,
         "endpoint": DATA_GO_KR_ENDPOINTS["15116892"],
+        "svyYr": yr,
+        "schlKrnNm": univ_name.strip(),
         "raw": body[:5000] if body else "",
         "attribution": attribution_text(),
         "from_cache": False,
         "dataset_id": "15116892",
         "dataset_name": DATA_GO_KR_DATASETS["15116892"],
+        "result_code": biz["result_code"],
+        "result_msg": biz["result_msg"],
     }
-    if payload["ok"]:
+    if biz["key_not_registered"]:
+        payload["activation_guide"] = (
+            "공공데이터포털 15116892 '한국대학교육협의회_대학별 학과정보' API에 "
+            "별도 활용신청이 필요합니다. https://www.data.go.kr/data/15116892/openapi.do "
+            "→ '활용신청' 클릭 → 자동승인 → 1~2시간 후 동일 인증키로 호출 가능."
+        )
+    if ok:
         _cache_put("kr", cache_key, payload)
     return payload
 
 
+def _default_svy_yr() -> int:
+    """KCUE 조사년도 기본값 — 결정론 산출. 최신 공개년도(올해 또는 작년) 사용.
+    KCUE 데이터는 매년 발표되지만 당해년도 데이터는 하반기에 공개되므로 보수적으로 (올해-1) 사용."""
+    import datetime
+    now = datetime.datetime.now()
+    # 1~7월: 작년-1 데이터(2년치 전), 8~12월: 작년
+    return (now.year - 2) if now.month < 8 else (now.year - 1)
+
+
 def kr_university_by_region(region: Any = None, per_page: int = 50) -> dict:
-    """지역별 대학 — 커리어넷 학교정보 + KCUE 대학 기본정보 통합 (15058917 + 15037507)."""
+    """지역별 대학 — 커리어넷 학교정보 (15058917) region 파라미터로 조회.
+    KCUE 기본정보(15037507)는 지역 필터 파라미터를 공식 명세에서 제공하지 않으므로
+    region 매칭은 결정론적으로 커리어넷 응답만 사용."""
     if not region or not isinstance(region, str) or not region.strip():
         return {"ok": False, "reason": "region required (예: 서울·경기·부산)"}
-    # 1차: 커리어넷 학교정보 region 파라미터
     career = kr_search_university(name=None, region=region, per_page=per_page)
-    # 2차: KCUE 대학알리미 기본정보 (지역 필터)
-    key = _require_kr_key()
-    kcue_payload: dict = {"ok": False, "reason": "data_go_kr key not registered"}
-    if key:
-        per = max(1, min(int(per_page), 100))
-        params = {
-            "serviceKey": key,
-            "pageNo": 1,
-            "numOfRows": per,
-            "type": "json",
-            "schlSido": region.strip(),
-        }
-        status, body = _http_get(DATA_GO_KR_ENDPOINTS["15037507"], params)
-        kcue_payload = {
-            "ok": status == 200,
-            "status": status,
-            "endpoint": DATA_GO_KR_ENDPOINTS["15037507"],
-            "raw": body[:5000] if body else "",
-            "dataset_id": "15037507",
-            "dataset_name": DATA_GO_KR_DATASETS["15037507"],
-        }
     return {
-        "ok": career.get("ok") or kcue_payload.get("ok"),
+        "ok": career.get("ok", False),
         "region": region,
         "career_net_school_info": career,
-        "kcue_univ_info": kcue_payload,
         "attribution": attribution_text(),
+        "note": "지역 필터는 커리어넷 학교정보(15058917) region 파라미터로 수행. KCUE 15037507은 지역 필터 미지원 명세이므로 본 함수에서 제외.",
     }
 
 
@@ -893,9 +966,16 @@ def validate_api_endpoints_sync() -> dict:
     missing_ids = expected_ids - actual_ids
     extra_ids = actual_ids - expected_ids
     invalid: list[str] = []
+    # KCUE academyinfo.go.kr는 HTTPS 미지원(2026-05 실측: SSLV3_ALERT_HANDSHAKE_FAILURE) → HTTP 허용.
+    # 정부 KCUE 게이트웨이에 한해 예외, 나머지는 HTTPS 필수.
+    KCUE_HTTP_OK_PREFIX = "http://openapi.academyinfo.go.kr/"
     for ds_id, url in DATA_GO_KR_ENDPOINTS.items():
-        if not url.startswith("https://"):
-            invalid.append(f"{ds_id}: not HTTPS")
+        if url.startswith("https://"):
+            pass  # 정상
+        elif url.startswith(KCUE_HTTP_OK_PREFIX):
+            pass  # academyinfo.go.kr HTTPS 미지원 예외 허용
+        else:
+            invalid.append(f"{ds_id}: not HTTPS and not KCUE academyinfo HTTP")
         if " " in url:
             invalid.append(f"{ds_id}: whitespace in URL")
     return {
@@ -964,6 +1044,7 @@ def main() -> int:
 
     p = sub.add_parser("kr_majors_by_university")
     p.add_argument("--univ-name", default=None, dest="univ_name")
+    p.add_argument("--svy-yr", default=None, dest="svy_yr")
     p.add_argument("--per-page", type=int, default=50, dest="per_page")
 
     p = sub.add_parser("kr_university_by_region")
@@ -1019,7 +1100,7 @@ def main() -> int:
     elif cmd == "kr_career_resources":
         out = kr_career_resources(args.keyword, args.per_page)
     elif cmd == "kr_majors_by_university":
-        out = kr_majors_by_university(args.univ_name, args.per_page)
+        out = kr_majors_by_university(args.univ_name, args.svy_yr, args.per_page)
     elif cmd == "kr_university_by_region":
         out = kr_university_by_region(args.region, args.per_page)
     elif cmd == "onet_search_occupation":

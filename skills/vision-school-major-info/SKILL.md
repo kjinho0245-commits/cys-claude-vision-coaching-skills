@@ -84,16 +84,16 @@ python3 school_major_lib.py check_api_keys
 
 ### 3-C. 한국 데이터 호출 (8)
 
-| 함수 | 데이터셋 |
+| 함수 | 데이터셋 / 실측 svcCode·endpoint |
 |---|---|
-| `kr_search_university` | 15058917 — 학교 검색 |
-| `kr_search_major` | 15057878 — 학과 검색 |
-| `kr_career_search` | 15056641 — 직업 키워드 검색 |
-| `kr_major_detail` | 15057878 — 학과 상세 (관련직업·취업률·진출분야) |
-| `kr_career_detail` | 15056641 — 직업 상세 |
-| `kr_career_resources` | 15057135 — 진로자료 검색 |
-| `kr_majors_by_university` | 15116892 — 특정 대학의 학과 목록 |
-| `kr_university_by_region` | 15058917 + 15037507 — 지역별 대학 |
+| `kr_search_university` | 15058917 — career.go.kr `SCHOOL` + `gubun=univ_list` |
+| `kr_search_major` | 15057878 — career.go.kr `MAJOR` + `gubun=univ_list` |
+| `kr_career_search` | 15056641 — career.go.kr `JOB` + `gubun=job_dic_list` |
+| `kr_major_detail` | 15057878 — career.go.kr `MAJOR_VIEW` + `majorSeq` (keyword 시 자동 검색→상세 연쇄) |
+| `kr_career_detail` | 15056641 — career.go.kr `JOB_VIEW` + `jobdicSeq` (keyword 시 자동 검색→상세 연쇄) |
+| `kr_career_resources` | 15057135 — career.go.kr `COSE` (커리어넷 공식 가이드 명세) |
+| `kr_majors_by_university` | 15116892 — academyinfo.go.kr `SchoolMajorInfoService/getSchoolMajorInfo` + `svyYr·schlKrnNm` (XML 응답·결정론 파싱) |
+| `kr_university_by_region` | 15058917 — career.go.kr `SCHOOL` + `region` (KCUE 15037507은 region 미지원 명세이므로 제외) |
 
 ### 3-D. ONET (5)
 

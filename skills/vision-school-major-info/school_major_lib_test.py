@@ -363,12 +363,77 @@ def test_setup_guide_content():
 def test_dataset_consistency():
     expect("ENDPOINTS·DATASETS 같은 키", set(L.DATA_GO_KR_ENDPOINTS.keys()) == set(L.DATA_GO_KR_DATASETS.keys()))
     expect("DATA_GO_KR_DATASETS 7개", len(L.DATA_GO_KR_DATASETS) == 7)
+    # KCUE academyinfo는 HTTPS 미지원이므로 HTTP 허용. 커리어넷은 HTTPS.
     for ds_id, url in L.DATA_GO_KR_ENDPOINTS.items():
-        expect(f"endpoint {ds_id} HTTPS", url.startswith("https://"))
+        is_https = url.startswith("https://")
+        is_kcue_http = url.startswith("http://openapi.academyinfo.go.kr/")
+        expect(f"endpoint {ds_id} 보안 프로토콜", is_https or is_kcue_http)
 
 
 # ---------------------------------------------------------------------------
-# 11. SOC 코드 정규식 직접 검증
+# 11. KCUE 응답 XML 파싱 결정론 검증
+# ---------------------------------------------------------------------------
+
+def test_kcue_response_parsing():
+    # SERVICE KEY IS NOT REGISTERED 케이스
+    xml99 = ('<response><header><resultCode>99</resultCode>'
+             '<resultMsg>SERVICE KEY IS NOT REGISTERED ERROR.</resultMsg></header></response>')
+    p = L._kcue_response_status(xml99)
+    expect("KCUE 99 result_code", p["result_code"] == "99")
+    expect("KCUE 99 key_not_registered 검출", p["key_not_registered"])
+    expect("KCUE 99 business_ok False", not p["business_ok"])
+
+    # 정상 응답
+    xml00 = ('<response><header><resultCode>00</resultCode>'
+             '<resultMsg>NORMAL SERVICE.</resultMsg></header><body><items/></body></response>')
+    p = L._kcue_response_status(xml00)
+    expect("KCUE 00 business_ok", p["business_ok"])
+    expect("KCUE 00 key_not_registered False", not p["key_not_registered"])
+
+    # 응답 없음 / 파싱 실패
+    p = L._kcue_response_status("")
+    expect("KCUE 빈 응답 결정론", p["result_code"] == "")
+
+    # 다른 비즈니스 오류 (예: NO_OPENAPI_SERVICE_ERROR=12)
+    xml12 = '<response><header><resultCode>12</resultCode><resultMsg>NO OPENAPI SERVICE ERROR.</resultMsg></header></response>'
+    p = L._kcue_response_status(xml12)
+    expect("KCUE 12 detected", p["result_code"] == "12" and not p["business_ok"] and not p["key_not_registered"])
+
+
+def test_normalize_region():
+    expect("region 서울 → 서울특별시", L.normalize_region("서울") == "서울특별시")
+    expect("region 경기 → 경기도", L.normalize_region("경기") == "경기도")
+    expect("region 강원 → 강원특별자치도", L.normalize_region("강원") == "강원특별자치도")
+    expect("region 전북 → 전북특별자치도", L.normalize_region("전북") == "전북특별자치도")
+    expect("region 제주 → 제주특별자치도", L.normalize_region("제주") == "제주특별자치도")
+    expect("region 세종 → 세종특별자치시", L.normalize_region("세종") == "세종특별자치시")
+    # 이미 정규화된 값은 그대로
+    expect("region 경상남도 → 경상남도", L.normalize_region("경상남도") == "경상남도")
+    # 매핑 없는 값은 그대로
+    expect("region XX → XX", L.normalize_region("XX") == "XX")
+    # 빈 입력
+    expect("region 빈 입력 → None", L.normalize_region("") is None)
+    expect("region None → None", L.normalize_region(None) is None)
+
+
+def test_default_svy_yr():
+    # 보수적: 현재년도-1 또는 -2
+    import datetime
+    y = L._default_svy_yr()
+    now = datetime.datetime.now()
+    expect("svyYr 범위", y in (now.year - 1, now.year - 2))
+    expect("svyYr 정수", isinstance(y, int))
+
+
+def test_kcue_endpoints():
+    # KCUE 3개 endpoint가 academyinfo.go.kr 도메인을 가리키는지
+    for ds in ("15116892", "15037507", "15116816"):
+        url = L.DATA_GO_KR_ENDPOINTS[ds]
+        expect(f"KCUE {ds} academyinfo 도메인", "openapi.academyinfo.go.kr" in url)
+
+
+# ---------------------------------------------------------------------------
+# 12. SOC 코드 정규식 직접 검증
 # ---------------------------------------------------------------------------
 
 def test_soc_pattern():
@@ -404,6 +469,10 @@ def main() -> int:
     test_cross_reference_basic()
     test_setup_guide_content()
     test_dataset_consistency()
+    test_kcue_response_parsing()
+    test_normalize_region()
+    test_default_svy_yr()
+    test_kcue_endpoints()
     test_soc_pattern()
 
     total = PASS + FAIL

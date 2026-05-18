@@ -1185,6 +1185,270 @@ def menu_options() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 14b. 마스터 진입 (Mode D — Intake-Router) — E안 / 박사님 vision 시리즈 마스터 진입로
+# ---------------------------------------------------------------------------
+# vision-grill-with-docs는 vision 시리즈의 *마스터 진입 스킬*로 공식 지정됨.
+# 사용자가 처음 박사님 미래비전코칭에 입장할 때 호출되며, 한 문장 자유 답을 받아
+# 박사님 28개 스킬 중 *맞춤 진입 스킬*을 결정론으로 라우팅한다.
+# A/B/C/menu 모드 외에 *intake* 모드로 작동. route_mode가 빈 입력이거나 "처음/시작/막혀"
+# 같은 진입 키워드를 받으면 자동으로 intake로 분기 가능.
+
+# 사용자 상태 추적 — 같은 사용자가 반복 미래비전코칭을 받으면서 점진적 깊이 진입
+USER_STATE_PATH = os.path.expanduser("~/.config/vision-grill-with-docs/user_state.json")
+
+
+INTAKE_KEYWORDS = {
+    # 자기인식 미진단 — 첫 사용자
+    "first_visit": ["처음", "처음입니다", "어디서 시작", "어디부터", "시작", "입학"],
+    # 비전 명료성 부재
+    "vision_unclear": ["모르겠", "막막", "방향", "비전이 없", "비전 모르"],
+    # 큰 결정·막힘
+    "stuck_decision": ["결단", "결정", "고민", "막혔", "갈림길", "선택"],
+    # 영역별 진입
+    "career": ["진로", "전공", "학교", "직업", "취업", "이직", "창업"],
+    "finance": ["재정", "돈", "투자", "집", "대출", "빚"],
+    "relationship": ["결혼", "배우자", "가족", "관계", "이혼"],
+    "ministry": ["사역", "선교", "교회", "신학", "전임", "안수"],
+    "future_simulation": ["5년", "10년", "미래", "시뮬레이션"],
+    # 비전 점검·메타 검증
+    "vision_check": ["점검", "검증", "비전 진단", "비전 확인"],
+    # 박사님 본인
+    "doctor_self": ["박사님 본인", "본업", "미래학자", "집필"],
+}
+
+
+def route_intake(first_utterance: Any) -> dict:
+    """사용자가 vision-grill-with-docs를 처음 호출하면서 던진 한 문장 자유 답 →
+    박사님 28개 스킬 중 우선 진입 스킬·인터뷰 모드 결정.
+
+    인자:
+        first_utterance: 사용자 한 문장 답변 (자유 자연어). 빈 문자열이면 메뉴 분기.
+    """
+    if not isinstance(first_utterance, str) or not first_utterance.strip():
+        return {
+            "ok": True,
+            "mode": "menu",
+            "next_skill": None,
+            "matched_categories": [],
+            "guidance": (
+                "한 문장으로 지금 본인 상태를 말씀해주세요. 예시:\n"
+                " · '처음입니다. 어디서부터 시작해야 할지 모르겠어요.'\n"
+                " · '신학교 진학 결단을 앞두고 있는데 가족이 반대해요.'\n"
+                " · '진로·전공·학교 결정해야 합니다.'\n"
+                " · '재정 큰 결정 앞에서 막혔어요.'\n"
+                " · '비전이 막혀있어 생각이 정리되지 않습니다.'\n"
+                " · '박사님 본인 미래학자 본업 5년 집중 계획.'\n"
+            ),
+        }
+
+    text = first_utterance.strip()
+    norm = text.lower()
+    matched: list[str] = []
+    for cat, keywords in INTAKE_KEYWORDS.items():
+        for kw in keywords:
+            if kw in text:
+                if cat not in matched:
+                    matched.append(cat)
+                break
+
+    # 카테고리 우선순위 — 가장 강한 신호부터
+    # 박사님 책 흐름: 첫 입장이면 *진단부터* (vision-cys-competence).
+    # *명시된 영역*이 stuck_decision보다 우선 — "진로 결정"이면 stuck보다 career 라우팅이 더 정확.
+    priority = [
+        "doctor_self",         # 박사님 본인 → A 모드 (가장 강한 신호)
+        "vision_check",        # 메타 검증 → B 모드
+        "career", "finance", "relationship", "ministry",  # 영역 명시 → 해당 전문 스킬
+        "future_simulation",   # 미래 → C 모드
+        "stuck_decision",      # 영역 모호한 큰 결정 → C 모드 grill + LDR
+        "first_visit",         # 처음 → vision-cys-competence-visioncoding (박사님 책 공식 입학 진단)
+        "vision_unclear",      # 비전 모호 (자기인식 일부) → vision-clarity-coaching
+    ]
+    primary = next((c for c in priority if c in matched), None)
+
+    # 모드·다음 스킬 결정 (결정론)
+    if primary == "doctor_self":
+        return _intake_result("A", "vision-mission-frame", matched, text,
+            note="박사님 본인 비전 점검 — Mode A 1:1 grill 진입. vision-mission-frame으로 영적 직관력·이성적 판단력 양축 점검.")
+    if primary == "stuck_decision":
+        return _intake_result("C", "vision-grill-with-docs", matched, text,
+            note="큰 결정 앞 — Mode C 자유 주제 grill 진입. LDR 3조건 자동 판정·발행 가능.")
+    if primary == "vision_check":
+        return _intake_result("B", "vision-mission-frame", matched, text,
+            note="비전 메타 검증 — Mode B 산출물 검증. 다른 vision-* 스킬 산출물의 자기모순·박사님 사전 위반 검출.")
+    if primary in ("career",):
+        return _intake_result("C", "vision-school-major-info", matched, text,
+            note="진로·전공·학교 영역 — vision-school-major-info(한국 7 API + ONET)로 실데이터 확보 후 grill.")
+    if primary == "finance":
+        return _intake_result("C", "vision-financial-3shields-3windows", matched, text,
+            note="재정 영역 — 박사님 3방패+3창 모델로 진단 후 grill로 결정.")
+    if primary == "relationship":
+        return _intake_result("C", "vision-three-realm-balance", matched, text,
+            note="관계 영역 — 3영역(나·가족과 세상·정신적 가치) 균형 검사 후 grill.")
+    if primary == "ministry":
+        return _intake_result("C", "vision-mission-frame", matched, text,
+            note="사역 영역 — 비전 프레임 영적 직관력 축 grill 후 LDR.")
+    if primary == "future_simulation":
+        return _intake_result("C", "vision-futures-timeline-map", matched, text,
+            note="미래 시뮬레이션 — 박사님 미래지도 + 4가지 미래 활용.")
+    if primary == "vision_unclear":
+        return _intake_result("C", "vision-clarity-coaching", matched, text,
+            note="비전 모호 — vision-clarity-coaching(산파술 5단계)로 비전 한 문장 끄집어내기 권장.")
+    if primary == "first_visit":
+        return _intake_result("intake", "vision-cys-competence-visioncoding", matched, text,
+            note="첫 입장 — 박사님 책 공식 입학 진단 vision-cys-competence-visioncoding부터 시작 권고.")
+
+    # 매칭 없음 — 기본 Mode C (자유 주제 grill)
+    return _intake_result("C", "vision-grill-with-docs", matched, text,
+        note="매칭 카테고리 없음 — Mode C 자유 주제 grill로 진행. parse_topic로 추가 영역 식별.")
+
+
+def _intake_result(mode: str, next_skill: str, matched: list[str], text: str, note: str) -> dict:
+    return {
+        "ok": True,
+        "mode": mode,
+        "next_skill": next_skill,
+        "matched_categories": matched,
+        "input": text,
+        "note": note,
+        "related_skills": parse_topic(text).get("related_skills", []),
+    }
+
+
+def decide_first_skill(state: Any = None) -> dict:
+    """사용자 회차·완료 상태 기반으로 *지금* 가장 우선해야 할 스킬 결정.
+
+    state 키 (모두 선택):
+        - visit_count: int (1=첫 회, 2+=반복)
+        - completed_skills: list[str] (이미 완료한 스킬명)
+        - has_diagnosis: bool (진단 7종 중 하나라도)
+        - has_vision_statement: bool (비전 한 문장)
+        - current_stage: int (박사님 8단계 중 현재)
+    """
+    if state is None or not isinstance(state, dict):
+        state = {}
+    visit_count = int(state.get("visit_count", 1) or 1)
+    completed = state.get("completed_skills") or []
+    has_diagnosis = bool(state.get("has_diagnosis"))
+    has_vs = bool(state.get("has_vision_statement"))
+    stage = int(state.get("current_stage", 1) or 1)
+
+    # 첫 회 + 진단 없음 → 박사님 공식 입학 진단
+    if visit_count == 1 and not has_diagnosis:
+        return {
+            "ok": True,
+            "first_skill": "vision-cys-competence-visioncoding",
+            "reason": "첫 회·진단 없음. 박사님 책 공식 입학 진단부터 시작.",
+            "depth_mode": "shallow_first",  # 첫 회는 얕게
+        }
+    # 진단 있고 비전 모호 → 명료화
+    if has_diagnosis and not has_vs:
+        return {
+            "ok": True,
+            "first_skill": "vision-clarity-coaching",
+            "reason": "진단 완료·비전 한 문장 없음. 산파술 5단계 명료화 권장.",
+            "depth_mode": "medium",
+        }
+    # 비전 있음 → 단계별 진행 또는 grill 깊이
+    if has_vs:
+        stage_map = {
+            1: "vision-cys-competence-visioncoding",
+            2: "vision-personal-future-research",
+            3: "vision-future-needs-prediction",
+            4: "vision-values-visioncoding",
+            5: "vision-mission-frame",
+            6: "vision-statement-writer",
+            7: "vision-strategy-coach",
+            8: "vision-five-stages",
+        }
+        next_skill = stage_map.get(stage, "vision-five-stages")
+        # 같은 사용자 반복 방문 → 깊이 grill
+        depth = "deep_grill" if visit_count >= 2 else "medium"
+        return {
+            "ok": True,
+            "first_skill": next_skill,
+            "reason": f"비전 있음·{stage}단계 진행 중. 회차 {visit_count} → depth={depth}.",
+            "depth_mode": depth,
+        }
+    # 그 외 — 메타 grill 권장
+    return {
+        "ok": True,
+        "first_skill": "vision-grill-with-docs",
+        "reason": "상태 분기 명확하지 않음. 자유 주제 grill로 진입.",
+        "depth_mode": "medium",
+    }
+
+
+def track_user_state(action: Any = "read", **kwargs: Any) -> dict:
+    """사용자 회차·완료 단계 추적. ~/.config/vision-grill-with-docs/user_state.json.
+
+    action:
+        - "read" (기본): 현재 상태 반환
+        - "increment_visit": visit_count += 1
+        - "mark_completed": completed_skills에 skill 추가
+        - "set_vision_statement": has_vision_statement = True
+        - "set_stage": current_stage 갱신
+        - "reset": 초기화
+    """
+    os.makedirs(os.path.dirname(USER_STATE_PATH), exist_ok=True)
+
+    # load
+    if os.path.exists(USER_STATE_PATH):
+        try:
+            with open(USER_STATE_PATH, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            if not isinstance(state, dict):
+                state = {}
+        except (OSError, json.JSONDecodeError):
+            state = {}
+    else:
+        state = {}
+
+    state.setdefault("visit_count", 0)
+    state.setdefault("completed_skills", [])
+    state.setdefault("has_diagnosis", False)
+    state.setdefault("has_vision_statement", False)
+    state.setdefault("current_stage", 1)
+
+    if action == "read":
+        return {"ok": True, "state": state, "path": USER_STATE_PATH}
+    if action == "increment_visit":
+        state["visit_count"] = int(state.get("visit_count", 0)) + 1
+    elif action == "mark_completed":
+        skill = kwargs.get("skill")
+        if not isinstance(skill, str) or not skill.strip():
+            return {"ok": False, "reason": "skill required for mark_completed"}
+        if skill not in state["completed_skills"]:
+            state["completed_skills"].append(skill.strip())
+        # 진단 스킬 중 하나라도 완료하면 has_diagnosis = True
+        if skill.endswith("-visioncoding"):
+            state["has_diagnosis"] = True
+    elif action == "set_vision_statement":
+        state["has_vision_statement"] = True
+    elif action == "set_stage":
+        try:
+            state["current_stage"] = max(1, min(8, int(kwargs.get("stage", 1))))
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": "stage must be int 1-8"}
+    elif action == "reset":
+        state = {
+            "visit_count": 0,
+            "completed_skills": [],
+            "has_diagnosis": False,
+            "has_vision_statement": False,
+            "current_stage": 1,
+        }
+    else:
+        return {"ok": False, "reason": f"unknown action: {action}"}
+
+    # save
+    tmp = USER_STATE_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, USER_STATE_PATH)
+    return {"ok": True, "state": state, "path": USER_STATE_PATH, "action": action}
+
+
+# ---------------------------------------------------------------------------
 # 15. SYNC 검증 — STANDARD_GLOSSARY / ALLOWED_QUOTES / topic_skill_map
 # ---------------------------------------------------------------------------
 
@@ -2014,6 +2278,20 @@ def main() -> int:
     p = sub.add_parser("validate_ldr_chain")
     p.add_argument("--base", required=True)
 
+    # 마스터 진입 (E안)
+    p = sub.add_parser("route_intake")
+    p.add_argument("--text", default="", dest="text")
+
+    p = sub.add_parser("decide_first_skill")
+    p.add_argument("--state-json", default="{}", dest="state_json")
+
+    p = sub.add_parser("track_user_state")
+    p.add_argument("--action", default="read",
+                   choices=["read", "increment_visit", "mark_completed",
+                            "set_vision_statement", "set_stage", "reset"])
+    p.add_argument("--skill", default=None)
+    p.add_argument("--stage", type=int, default=None)
+
     p = sub.add_parser("refresh_university_cache")
     p.add_argument("--force", action="store_true")
 
@@ -2122,6 +2400,22 @@ def main() -> int:
         out = validate_context_integrity(args.base)
     elif args.cmd == "validate_ldr_chain":
         out = validate_ldr_chain(args.base)
+    elif args.cmd == "route_intake":
+        out = route_intake(args.text)
+    elif args.cmd == "decide_first_skill":
+        try:
+            state = json.loads(args.state_json) if args.state_json else {}
+        except json.JSONDecodeError as e:
+            out = {"ok": False, "reason": f"invalid state JSON: {e}"}
+        else:
+            out = decide_first_skill(state)
+    elif args.cmd == "track_user_state":
+        kw = {}
+        if args.skill is not None:
+            kw["skill"] = args.skill
+        if args.stage is not None:
+            kw["stage"] = args.stage
+        out = track_user_state(args.action, **kw)
     elif args.cmd == "refresh_university_cache":
         out = refresh_university_cache(force=bool(args.force))
     elif args.cmd == "lookup_korean_university":
