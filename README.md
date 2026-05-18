@@ -39,135 +39,6 @@ This package is published on GitHub to realize the **Vision Reproduction — the
 
 ---
 
-## 📢 최근 업데이트 / Recent Updates
-
-**2026-05-18 — vision-foresight 4 시리즈 신규 통합 — 박사님 미래학자 본업 자산을 vision pipeline에 학문적 깊이로 결합**
-
-박사님 미래학자 본업의 시그니처 자산(*Millennium Project Futures Research Methodology V3.0* 풀 구현 38 마스터 + 200+ sub-skill)에서 핵심 4 시리즈를 cys-claude-vision-coaching-skills에 *vision-* 접두사로 복제·통합. **원본 cys-claude-foresight-skills는 파일시스템 그대로 보존**.
-
-- **`vision-foresight-environmental-scanning`** (Gordon·Glenn 2009 FRM V3.0 02장 + 5 sub-skill) — STEEPS 6영역·약한 신호 탐지·이슈 매니지먼트·QUEST 워크숍 → **박사님 8단계 중 1단계 Vision Coding + 2단계 미래 예측 학문적 토대**
-- **`vision-foresight-futures-wheel`** (Glenn 1971 FRM V3.0 06장 + 9 sub-skill) — 1차·2차·6차 결과 추적·STEEPS 192 노드·박사님 2026-05-11 강화 7 protocol → **박사님 8단계 중 2단계 미래 예측의 정통 골격** (기존 `vision-four-futures`와 결합)
-- **`vision-foresight-wild-cards`** (Petersen·Steinmüller FRM V3.0 10장 + 7 sub-skill) — Arlington Impact Index·박사님 책 ④ 뜻밖의 미래(비약적 진보·붕괴) → **박사님 8단계 중 2·3단계 위기·게임체인저 대비** (기존 `vision-futures-timeline-map`의 wildcard 축 보강)
-- **`vision-foresight-scenarios`** (Glenn·TFG FRM V3.0 19장 + 12 sub-skill — 박사님 미래학자 본업 *시그니처 method*) — Schwartz GBN 6 steps·Cone of Plausibility·Coates-Jarratt·9 methods catalogue → **박사님 8단계 중 5단계 비전 출발점·큰 그림 학문적 통합** (기존 `vision-clarity-coaching`·`vision-mission-frame`과 결합)
-
-작업 통계:
-- **37 폴더 복제** (4 마스터 + 33 sub-skill)·**54,305 lines 신규**·**510 lines sed 치환** (vision-foresight-* prefix + SKILL_DIR 경로)
-- 외부 foresight-* 참조 20건 (delphi·expert-pool·cross-impact 등) *원본 그대로 보존*
-- 박사님 책 verbatim·외부 학자 인용·학술 용어 *변경 0건*
-- `vision-grill-with-docs/topic_skill_map.md` 영역 9 *미래학 도구* 신규 추가 — 7 키워드 라인 + Stage 매핑
-- 35 신규 symlink로 `~/.claude/skills/` 글로벌 등록 — 즉시 활용 가능
-
-검증·시뮬레이션:
-- 김민준(16세 고1)·박서연(12세 초6)·이수민(29세 청년 전환자) 3 페르소나 cross-orchestration PASS
-- 누적 단위 테스트 1,097+ PASS · 회귀 0건
-- 박사님 시그니처 도구 `vision-futures-timeline-map` 결함 0건 유지
-
-vision 시리즈 구조:
-- 사용자 직접 호출 가능 **마스터 32개** (vision 28 + vision-foresight 4)
-- INTERNAL sub-skill 33개 (vision-foresight 4 마스터 산하)
-- 총 65 폴더 + 결정론 모듈·박사님 책 verbatim 인용·할루시네이션 차단 절대 원칙 보존
-
-**2026-05-18 — vision-foresight 4 series integrated — Dr. Choi's futurist signature assets joined to vision pipeline with academic depth**
-
-Dr. Choi's signature assets (full implementation of *Millennium Project Futures Research Methodology V3.0* — 38 masters + 200+ sub-skills) — the 4 core series cloned with `vision-` prefix into cys-claude-vision-coaching-skills. **Original cys-claude-foresight-skills preserved as-is (filesystem untouched)**.
-
-- **`vision-foresight-environmental-scanning`** — STEEPS 6 domains·weak-signal detection·issues management·QUEST workshop → **academic foundation for Stages 1·2**
-- **`vision-foresight-futures-wheel`** — 1st·2nd·6th order consequence tracking·STEEPS 192 nodes → **academic backbone for Stage 2 future forecasting** (combined with `vision-four-futures`)
-- **`vision-foresight-wild-cards`** — Arlington Impact Index·Dr. Choi's Book ④ Unexpected Future → **Stages 2·3 crisis & game-changer preparation**
-- **`vision-foresight-scenarios`** — Schwartz GBN·Cone of Plausibility·9 methods (Dr. Choi's futurist signature method) → **Stage 5 vision starting point·big picture academic integration**
-
-Stats: 37 folders cloned · 54,305 lines added · 510 lines sed-substituted · 3-persona cross-orchestration PASS · 1,097+ unit tests cumulative · 0 regression. 32 user-callable masters (28 vision + 4 vision-foresight) + 33 INTERNAL sub-skills.
-
-**2026-05-18 — `vision-grill-with-docs`를 vision 시리즈 *마스터 진입 스킬*로 공식 지정 (E안)**
-- 박사님 결정: 마스터 진입 허브 신설(vision-start 안) 폐기 → `vision-grill-with-docs`가 이미 cross-stage 메타 인터뷰 엔진으로서 마스터 진입 자격을 갖췄음이 확인됨
-- 새 결정론 함수 3개 추가 — `route_intake` (한 문장 자유 답 → 진입 스킬 라우팅, 10 카테고리 결정론 매칭) · `decide_first_skill` (사용자 상태 → 우선 스킬 결정) · `track_user_state` (사용자 회차·완료 단계 추적, `~/.config/vision-grill-with-docs/user_state.json`)
-- Mode D **Intake-Router** 신설 — 빈 호출 시 한 문장 답 유도 + 답 받으면 28개 vision 스킬 중 *맞춤 진입 스킬* 자동 라우팅 + 점진적 깊이로 반복 회차마다 더 깊은 grill
-- 박사님 책 흐름 1:1 일치 — 첫 입장 → 박사님 책 공식 입학 진단(vision-cys-competence) → 5단계 사이클 진입 → 막힘 시 grill
-- 결정론 함수 31 → **34개**, 신규 스킬 0개 (28 유지)
-- 검증: 단위 207 + 기존 라운드 33 + Pass 5 v2 39 = **279/279 PASS**
-
-**2026-05-18 — `vision-grill-with-docs` officially designated as vision-series *master entry skill* (Option E)**
-- Dr. Choi's decision: discarded new master-entry skill (vision-start) — confirmed that `vision-grill-with-docs` already qualifies as master entry by being the cross-stage meta-interview engine
-- 3 new deterministic functions — `route_intake` (one-sentence input → entry-skill routing, 10-category deterministic matching) · `decide_first_skill` (user state → priority skill) · `track_user_state` (visit count·completion tracking)
-- New Mode D **Intake-Router** — empty call elicits a one-sentence answer; once provided, auto-routes to the right entry skill among 28 vision skills + progressive depth per repeated session
-- 1:1 fit with Dr. Choi's book: first visit → CYS official entry diagnosis → 5-stage cycle → grill when stuck
-- 31 → **34 deterministic functions**, 0 new skills (still 28)
-- Validation: 207 unit + 33 round + 39 Pass 5 v2 = **279/279 PASS**
-
-**2026-05-18 — 28번째 vision 스킬 `vision-school-major-info` 신설 (한국 7개 API + ONET 데이터 백본)**
-- 공공데이터포털 키 1개로 7개 API 통합 호출 — 커리어넷 4종(학과·학교·직업·진로자료) + KCUE 3종(학과·기본정보·통합)
-- ONET Web Services v2.0 — 미국 923 직업 · 1,016 SOC 코드 · 277 descriptors · 분기 갱신 (선택 기능)
-- 사용자 본인 키 입력 방식 — `check_api_keys` 진입 가드가 미등록 시 setup_guide 자동 안내
-- `~/.config/vision-school-major-info/api_keys.json` (chmod 600) 안전 저장
-- 결정론 모듈 `school_major_lib.py` 16+ 함수 — 진입 가드 3 · 한국 데이터 호출 · ONET · Holland→ONET 매핑 · 한↔영 학과 사전 · CC-BY attribution 자동 생성
-- `ystory/korea-universities` 491개 대학 데이터 캐시(7일 TTL) — `vision-grill-with-docs/grill_lib.py`에 통합
-- 검증: 단위 56 PASS + 검증 라운드 24 PASS
-- 새 카테고리 **`data` (Data Backbone — External API)** 도입
-- 박사님 vision-strong-visioncoding(Holland/RIASEC) ↔ ONET 직업 자동 매핑
-
-**2026-05-18 — 28th vision skill `vision-school-major-info` added (Korean 7-API + ONET data backbone)**
-- Public data portal single-key access to 7 Korean APIs — Career-net (major·school·job·resources) + KCUE (major·univ·combined)
-- O*NET Web Services v2.0 — US 923 occupations · 1,016 SOC codes · 277 descriptors · quarterly update (optional)
-- User-owned API key model — entry guard `check_api_keys` auto-emits setup_guide if missing
-- Safe storage at `~/.config/vision-school-major-info/api_keys.json` (chmod 600)
-- Deterministic module `school_major_lib.py` with 16+ functions — guards · Korean lookup · ONET · Holland→ONET mapping · KO-EN major dict · CC-BY attribution auto-generation
-- `ystory/korea-universities` 491-university data cached (7-day TTL) — integrated into `vision-grill-with-docs/grill_lib.py`
-- Validation: 56 unit PASS + 24 round PASS
-- New category **`data` (Data Backbone — External API)**
-- Auto-mapping between Dr. Choi's vision-strong-visioncoding (Holland/RIASEC) ↔ ONET occupations
-
-**2026-05-18 — 27번째 vision 스킬 `vision-grill-with-docs` 신설 (cross-stage 메타 인터뷰 엔진)**
-- Matt Pocock의 `grill-with-docs` 패턴을 미래비전코칭 맥락으로 전면 커스터마이즈
-- **3-모드**: A(비전 grill 1:1 인터뷰) · B(다른 vision 산출물 메타 검증) · C(다목적 자유 주제 인터뷰 — 진로·재정·관계·사역 등 어떤 주제든)
-- **LDR (Life Decision Record)** — ADR을 인생 결정 기록기로 매핑, 3조건(번복 어려움·미래 의문·진짜 trade-off) 자동 판정
-- 결정론 모듈 `grill_lib.py` **21개 함수** — 박사님 사전 충돌·인용 위조 차단·LDR 자격·sync 검증 등 LLM 자연어 추론 완전 차단
-- 검증 **211/211 PASS** (단위 130 + 기존 라운드 48 + 신규 10시나리오 33)
-- 새 카테고리 **`meta` (Cross-stage)** 도입 — 8단계 어디서든 호출 가능
-- 부수: 카탈로그 자동 빌드 재생성 (`README.md` · `docs/SKILL_CATALOG.md`)
-
-**2026-05-18 — 27th vision skill `vision-grill-with-docs` added (cross-stage meta-interview engine)**
-- Customizes Matt Pocock's `grill-with-docs` pattern for Dr. Choi's vision coaching context
-- **3 modes**: A (1:1 vision grill) · B (verify other vision skill artifacts) · C (free-form interview on any topic — career·finance·relationship·ministry)
-- **LDR (Life Decision Record)** — ADR mapped to life-decision recorder, 3-criteria gate (hard-to-reverse · surprising · real trade-off) auto-evaluated
-- Deterministic module `grill_lib.py` with **21 functions** — blocks LLM natural-language inference for fact lookup·quote forgery·LDR qualification·sync validation
-- Validation **211/211 PASS** (130 unit + 48 existing round + 33 new 10-scenario)
-- New category **`meta` (Cross-stage)** — invokable at any of the 8 stages
-- Side update: catalog regenerated (`README.md` · `docs/SKILL_CATALOG.md`)
-
-**2026-05-17 — 26개 vision 스킬 결정론 모듈·테스트·검증 자료 일괄 추가**
-- 26개 SKILL.md 본문 보강 (총 +3,505줄 / −1,352줄)
-- 스킬별 결정론 엔진·라이브러리·검증 스크립트·테스트 시나리오 신규 추가
-  (career-recommendation·clarity·enneagram·mbti·five-stages·follow-through·
-   four-futures·futures-timeline·goal-reframing·mission-frame·multipleintel·
-   personal-future-research·progress-review·readiness·smart-five·statement·
-   strategy·strong·three-realm·values·financial-3shields·financial-coach·
-   future-needs·future-promise·cys-competence·eight-training 등 전 영역)
-- `.gitignore`에 Python 캐시(`__pycache__`·`*.pyc`) 패턴 추가
-- 변경량: 202 files, +44,864줄 / −1,352줄 (커밋 `710a3f9`)
-- 부수 갱신: `docs/SKILL_CATALOG.md` 자동 빌드 재생성
-
-**2026-05-17 — Deterministic modules·tests·validation assets added to 26 vision skills**
-- 26 SKILL.md bodies enhanced (+3,505 / −1,352 lines in skill docs)
-- Per-skill deterministic engines, libraries, validation scripts, and test
-  scenarios added across all four areas (diagnosis · spine · flesh · prescription)
-- `.gitignore` extended with Python cache patterns (`__pycache__`·`*.pyc`)
-- Diff: 202 files, +44,864 / −1,352 lines (commit `710a3f9`)
-- Side update: `docs/SKILL_CATALOG.md` regenerated via auto-build
-
-**2026-05-13 — 22개 vision 스킬 대규모 품질 보강**
-- 진단·척추·살근육·처방 전 영역 22개 SKILL.md 일괄 업데이트
-- 박사님 책 인용 정밀화 + 코칭 흐름 일관성 강화
-- 변경량: +3,051줄 / −932줄
-- 부수 갱신: `docs/SKILL_CATALOG.md` 자동 빌드 재생성
-
-**2026-05-13 — Large-scale quality enhancement of 22 vision skills**
-- 22 SKILL.md files updated across diagnosis · spine · flesh · prescription
-- Refined Dr. Choi's book citations · strengthened coaching flow consistency
-- Diff: +3,051 / −932 lines
-- Side update: `docs/SKILL_CATALOG.md` regenerated via auto-build
-
----
-
 ## 🎯 누구를 위한 패키지인가? / Who Is This For?
 
 | 대상 / Target | 추천 활용 / Recommended Use |
@@ -1077,6 +948,135 @@ cys-claude-vision-coaching-skills/
 │ └── vision-progress-review/
 └── examples/ # 시나리오 예시 (Phase 3)
 ```
+
+---
+
+## 📢 최근 업데이트 / Recent Updates
+
+**2026-05-18 — vision-foresight 4 시리즈 신규 통합 — 박사님 미래학자 본업 자산을 vision pipeline에 학문적 깊이로 결합**
+
+박사님 미래학자 본업의 시그니처 자산(*Millennium Project Futures Research Methodology V3.0* 풀 구현 38 마스터 + 200+ sub-skill)에서 핵심 4 시리즈를 cys-claude-vision-coaching-skills에 *vision-* 접두사로 복제·통합. **원본 cys-claude-foresight-skills는 파일시스템 그대로 보존**.
+
+- **`vision-foresight-environmental-scanning`** (Gordon·Glenn 2009 FRM V3.0 02장 + 5 sub-skill) — STEEPS 6영역·약한 신호 탐지·이슈 매니지먼트·QUEST 워크숍 → **박사님 8단계 중 1단계 Vision Coding + 2단계 미래 예측 학문적 토대**
+- **`vision-foresight-futures-wheel`** (Glenn 1971 FRM V3.0 06장 + 9 sub-skill) — 1차·2차·6차 결과 추적·STEEPS 192 노드·박사님 2026-05-11 강화 7 protocol → **박사님 8단계 중 2단계 미래 예측의 정통 골격** (기존 `vision-four-futures`와 결합)
+- **`vision-foresight-wild-cards`** (Petersen·Steinmüller FRM V3.0 10장 + 7 sub-skill) — Arlington Impact Index·박사님 책 ④ 뜻밖의 미래(비약적 진보·붕괴) → **박사님 8단계 중 2·3단계 위기·게임체인저 대비** (기존 `vision-futures-timeline-map`의 wildcard 축 보강)
+- **`vision-foresight-scenarios`** (Glenn·TFG FRM V3.0 19장 + 12 sub-skill — 박사님 미래학자 본업 *시그니처 method*) — Schwartz GBN 6 steps·Cone of Plausibility·Coates-Jarratt·9 methods catalogue → **박사님 8단계 중 5단계 비전 출발점·큰 그림 학문적 통합** (기존 `vision-clarity-coaching`·`vision-mission-frame`과 결합)
+
+작업 통계:
+- **37 폴더 복제** (4 마스터 + 33 sub-skill)·**54,305 lines 신규**·**510 lines sed 치환** (vision-foresight-* prefix + SKILL_DIR 경로)
+- 외부 foresight-* 참조 20건 (delphi·expert-pool·cross-impact 등) *원본 그대로 보존*
+- 박사님 책 verbatim·외부 학자 인용·학술 용어 *변경 0건*
+- `vision-grill-with-docs/topic_skill_map.md` 영역 9 *미래학 도구* 신규 추가 — 7 키워드 라인 + Stage 매핑
+- 35 신규 symlink로 `~/.claude/skills/` 글로벌 등록 — 즉시 활용 가능
+
+검증·시뮬레이션:
+- 김민준(16세 고1)·박서연(12세 초6)·이수민(29세 청년 전환자) 3 페르소나 cross-orchestration PASS
+- 누적 단위 테스트 1,097+ PASS · 회귀 0건
+- 박사님 시그니처 도구 `vision-futures-timeline-map` 결함 0건 유지
+
+vision 시리즈 구조:
+- 사용자 직접 호출 가능 **마스터 32개** (vision 28 + vision-foresight 4)
+- INTERNAL sub-skill 33개 (vision-foresight 4 마스터 산하)
+- 총 65 폴더 + 결정론 모듈·박사님 책 verbatim 인용·할루시네이션 차단 절대 원칙 보존
+
+**2026-05-18 — vision-foresight 4 series integrated — Dr. Choi's futurist signature assets joined to vision pipeline with academic depth**
+
+Dr. Choi's signature assets (full implementation of *Millennium Project Futures Research Methodology V3.0* — 38 masters + 200+ sub-skills) — the 4 core series cloned with `vision-` prefix into cys-claude-vision-coaching-skills. **Original cys-claude-foresight-skills preserved as-is (filesystem untouched)**.
+
+- **`vision-foresight-environmental-scanning`** — STEEPS 6 domains·weak-signal detection·issues management·QUEST workshop → **academic foundation for Stages 1·2**
+- **`vision-foresight-futures-wheel`** — 1st·2nd·6th order consequence tracking·STEEPS 192 nodes → **academic backbone for Stage 2 future forecasting** (combined with `vision-four-futures`)
+- **`vision-foresight-wild-cards`** — Arlington Impact Index·Dr. Choi's Book ④ Unexpected Future → **Stages 2·3 crisis & game-changer preparation**
+- **`vision-foresight-scenarios`** — Schwartz GBN·Cone of Plausibility·9 methods (Dr. Choi's futurist signature method) → **Stage 5 vision starting point·big picture academic integration**
+
+Stats: 37 folders cloned · 54,305 lines added · 510 lines sed-substituted · 3-persona cross-orchestration PASS · 1,097+ unit tests cumulative · 0 regression. 32 user-callable masters (28 vision + 4 vision-foresight) + 33 INTERNAL sub-skills.
+
+**2026-05-18 — `vision-grill-with-docs`를 vision 시리즈 *마스터 진입 스킬*로 공식 지정 (E안)**
+- 박사님 결정: 마스터 진입 허브 신설(vision-start 안) 폐기 → `vision-grill-with-docs`가 이미 cross-stage 메타 인터뷰 엔진으로서 마스터 진입 자격을 갖췄음이 확인됨
+- 새 결정론 함수 3개 추가 — `route_intake` (한 문장 자유 답 → 진입 스킬 라우팅, 10 카테고리 결정론 매칭) · `decide_first_skill` (사용자 상태 → 우선 스킬 결정) · `track_user_state` (사용자 회차·완료 단계 추적, `~/.config/vision-grill-with-docs/user_state.json`)
+- Mode D **Intake-Router** 신설 — 빈 호출 시 한 문장 답 유도 + 답 받으면 28개 vision 스킬 중 *맞춤 진입 스킬* 자동 라우팅 + 점진적 깊이로 반복 회차마다 더 깊은 grill
+- 박사님 책 흐름 1:1 일치 — 첫 입장 → 박사님 책 공식 입학 진단(vision-cys-competence) → 5단계 사이클 진입 → 막힘 시 grill
+- 결정론 함수 31 → **34개**, 신규 스킬 0개 (28 유지)
+- 검증: 단위 207 + 기존 라운드 33 + Pass 5 v2 39 = **279/279 PASS**
+
+**2026-05-18 — `vision-grill-with-docs` officially designated as vision-series *master entry skill* (Option E)**
+- Dr. Choi's decision: discarded new master-entry skill (vision-start) — confirmed that `vision-grill-with-docs` already qualifies as master entry by being the cross-stage meta-interview engine
+- 3 new deterministic functions — `route_intake` (one-sentence input → entry-skill routing, 10-category deterministic matching) · `decide_first_skill` (user state → priority skill) · `track_user_state` (visit count·completion tracking)
+- New Mode D **Intake-Router** — empty call elicits a one-sentence answer; once provided, auto-routes to the right entry skill among 28 vision skills + progressive depth per repeated session
+- 1:1 fit with Dr. Choi's book: first visit → CYS official entry diagnosis → 5-stage cycle → grill when stuck
+- 31 → **34 deterministic functions**, 0 new skills (still 28)
+- Validation: 207 unit + 33 round + 39 Pass 5 v2 = **279/279 PASS**
+
+**2026-05-18 — 28번째 vision 스킬 `vision-school-major-info` 신설 (한국 7개 API + ONET 데이터 백본)**
+- 공공데이터포털 키 1개로 7개 API 통합 호출 — 커리어넷 4종(학과·학교·직업·진로자료) + KCUE 3종(학과·기본정보·통합)
+- ONET Web Services v2.0 — 미국 923 직업 · 1,016 SOC 코드 · 277 descriptors · 분기 갱신 (선택 기능)
+- 사용자 본인 키 입력 방식 — `check_api_keys` 진입 가드가 미등록 시 setup_guide 자동 안내
+- `~/.config/vision-school-major-info/api_keys.json` (chmod 600) 안전 저장
+- 결정론 모듈 `school_major_lib.py` 16+ 함수 — 진입 가드 3 · 한국 데이터 호출 · ONET · Holland→ONET 매핑 · 한↔영 학과 사전 · CC-BY attribution 자동 생성
+- `ystory/korea-universities` 491개 대학 데이터 캐시(7일 TTL) — `vision-grill-with-docs/grill_lib.py`에 통합
+- 검증: 단위 56 PASS + 검증 라운드 24 PASS
+- 새 카테고리 **`data` (Data Backbone — External API)** 도입
+- 박사님 vision-strong-visioncoding(Holland/RIASEC) ↔ ONET 직업 자동 매핑
+
+**2026-05-18 — 28th vision skill `vision-school-major-info` added (Korean 7-API + ONET data backbone)**
+- Public data portal single-key access to 7 Korean APIs — Career-net (major·school·job·resources) + KCUE (major·univ·combined)
+- O*NET Web Services v2.0 — US 923 occupations · 1,016 SOC codes · 277 descriptors · quarterly update (optional)
+- User-owned API key model — entry guard `check_api_keys` auto-emits setup_guide if missing
+- Safe storage at `~/.config/vision-school-major-info/api_keys.json` (chmod 600)
+- Deterministic module `school_major_lib.py` with 16+ functions — guards · Korean lookup · ONET · Holland→ONET mapping · KO-EN major dict · CC-BY attribution auto-generation
+- `ystory/korea-universities` 491-university data cached (7-day TTL) — integrated into `vision-grill-with-docs/grill_lib.py`
+- Validation: 56 unit PASS + 24 round PASS
+- New category **`data` (Data Backbone — External API)**
+- Auto-mapping between Dr. Choi's vision-strong-visioncoding (Holland/RIASEC) ↔ ONET occupations
+
+**2026-05-18 — 27번째 vision 스킬 `vision-grill-with-docs` 신설 (cross-stage 메타 인터뷰 엔진)**
+- Matt Pocock의 `grill-with-docs` 패턴을 미래비전코칭 맥락으로 전면 커스터마이즈
+- **3-모드**: A(비전 grill 1:1 인터뷰) · B(다른 vision 산출물 메타 검증) · C(다목적 자유 주제 인터뷰 — 진로·재정·관계·사역 등 어떤 주제든)
+- **LDR (Life Decision Record)** — ADR을 인생 결정 기록기로 매핑, 3조건(번복 어려움·미래 의문·진짜 trade-off) 자동 판정
+- 결정론 모듈 `grill_lib.py` **21개 함수** — 박사님 사전 충돌·인용 위조 차단·LDR 자격·sync 검증 등 LLM 자연어 추론 완전 차단
+- 검증 **211/211 PASS** (단위 130 + 기존 라운드 48 + 신규 10시나리오 33)
+- 새 카테고리 **`meta` (Cross-stage)** 도입 — 8단계 어디서든 호출 가능
+- 부수: 카탈로그 자동 빌드 재생성 (`README.md` · `docs/SKILL_CATALOG.md`)
+
+**2026-05-18 — 27th vision skill `vision-grill-with-docs` added (cross-stage meta-interview engine)**
+- Customizes Matt Pocock's `grill-with-docs` pattern for Dr. Choi's vision coaching context
+- **3 modes**: A (1:1 vision grill) · B (verify other vision skill artifacts) · C (free-form interview on any topic — career·finance·relationship·ministry)
+- **LDR (Life Decision Record)** — ADR mapped to life-decision recorder, 3-criteria gate (hard-to-reverse · surprising · real trade-off) auto-evaluated
+- Deterministic module `grill_lib.py` with **21 functions** — blocks LLM natural-language inference for fact lookup·quote forgery·LDR qualification·sync validation
+- Validation **211/211 PASS** (130 unit + 48 existing round + 33 new 10-scenario)
+- New category **`meta` (Cross-stage)** — invokable at any of the 8 stages
+- Side update: catalog regenerated (`README.md` · `docs/SKILL_CATALOG.md`)
+
+**2026-05-17 — 26개 vision 스킬 결정론 모듈·테스트·검증 자료 일괄 추가**
+- 26개 SKILL.md 본문 보강 (총 +3,505줄 / −1,352줄)
+- 스킬별 결정론 엔진·라이브러리·검증 스크립트·테스트 시나리오 신규 추가
+  (career-recommendation·clarity·enneagram·mbti·five-stages·follow-through·
+   four-futures·futures-timeline·goal-reframing·mission-frame·multipleintel·
+   personal-future-research·progress-review·readiness·smart-five·statement·
+   strategy·strong·three-realm·values·financial-3shields·financial-coach·
+   future-needs·future-promise·cys-competence·eight-training 등 전 영역)
+- `.gitignore`에 Python 캐시(`__pycache__`·`*.pyc`) 패턴 추가
+- 변경량: 202 files, +44,864줄 / −1,352줄 (커밋 `710a3f9`)
+- 부수 갱신: `docs/SKILL_CATALOG.md` 자동 빌드 재생성
+
+**2026-05-17 — Deterministic modules·tests·validation assets added to 26 vision skills**
+- 26 SKILL.md bodies enhanced (+3,505 / −1,352 lines in skill docs)
+- Per-skill deterministic engines, libraries, validation scripts, and test
+  scenarios added across all four areas (diagnosis · spine · flesh · prescription)
+- `.gitignore` extended with Python cache patterns (`__pycache__`·`*.pyc`)
+- Diff: 202 files, +44,864 / −1,352 lines (commit `710a3f9`)
+- Side update: `docs/SKILL_CATALOG.md` regenerated via auto-build
+
+**2026-05-13 — 22개 vision 스킬 대규모 품질 보강**
+- 진단·척추·살근육·처방 전 영역 22개 SKILL.md 일괄 업데이트
+- 박사님 책 인용 정밀화 + 코칭 흐름 일관성 강화
+- 변경량: +3,051줄 / −932줄
+- 부수 갱신: `docs/SKILL_CATALOG.md` 자동 빌드 재생성
+
+**2026-05-13 — Large-scale quality enhancement of 22 vision skills**
+- 22 SKILL.md files updated across diagnosis · spine · flesh · prescription
+- Refined Dr. Choi's book citations · strengthened coaching flow consistency
+- Diff: +3,051 / −932 lines
+- Side update: `docs/SKILL_CATALOG.md` regenerated via auto-build
 
 ---
 
