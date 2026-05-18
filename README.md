@@ -5,7 +5,9 @@
 
 <!-- AUTO:BADGE -->
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-[![Skills: 28](https://img.shields.io/badge/Skills-28-blue)](docs/SKILL_CATALOG.md)
+[![Masters: 32](https://img.shields.io/badge/Masters-32-blue)](docs/SKILL_CATALOG.md)
+[![Sub--skills: 33](https://img.shields.io/badge/Sub--skills-33-blueviolet)](docs/SKILL_CATALOG.md)
+[![Foresight: 4 series](https://img.shields.io/badge/Foresight-4%20series-orange)](#7-%EB%AF%B8%EB%9E%98%ED%95%99-%EB%8F%84%EA%B5%AC--foresight-methodology)
 [![Korean](https://img.shields.io/badge/언어-한국어%20%2B%20English-success)](#)
 <!-- /AUTO:BADGE -->
 
@@ -38,6 +40,43 @@ This package is published on GitHub to realize the **Vision Reproduction — the
 ---
 
 ## 📢 최근 업데이트 / Recent Updates
+
+**2026-05-18 — vision-foresight 4 시리즈 신규 통합 — 박사님 미래학자 본업 자산을 vision pipeline에 학문적 깊이로 결합**
+
+박사님 미래학자 본업의 시그니처 자산(*Millennium Project Futures Research Methodology V3.0* 풀 구현 38 마스터 + 200+ sub-skill)에서 핵심 4 시리즈를 cys-claude-vision-coaching-skills에 *vision-* 접두사로 복제·통합. **원본 cys-claude-foresight-skills는 파일시스템 그대로 보존**.
+
+- **`vision-foresight-environmental-scanning`** (Gordon·Glenn 2009 FRM V3.0 02장 + 5 sub-skill) — STEEPS 6영역·약한 신호 탐지·이슈 매니지먼트·QUEST 워크숍 → **박사님 8단계 중 1단계 Vision Coding + 2단계 미래 예측 학문적 토대**
+- **`vision-foresight-futures-wheel`** (Glenn 1971 FRM V3.0 06장 + 9 sub-skill) — 1차·2차·6차 결과 추적·STEEPS 192 노드·박사님 2026-05-11 강화 7 protocol → **박사님 8단계 중 2단계 미래 예측의 정통 골격** (기존 `vision-four-futures`와 결합)
+- **`vision-foresight-wild-cards`** (Petersen·Steinmüller FRM V3.0 10장 + 7 sub-skill) — Arlington Impact Index·박사님 책 ④ 뜻밖의 미래(비약적 진보·붕괴) → **박사님 8단계 중 2·3단계 위기·게임체인저 대비** (기존 `vision-futures-timeline-map`의 wildcard 축 보강)
+- **`vision-foresight-scenarios`** (Glenn·TFG FRM V3.0 19장 + 12 sub-skill — 박사님 미래학자 본업 *시그니처 method*) — Schwartz GBN 6 steps·Cone of Plausibility·Coates-Jarratt·9 methods catalogue → **박사님 8단계 중 5단계 비전 출발점·큰 그림 학문적 통합** (기존 `vision-clarity-coaching`·`vision-mission-frame`과 결합)
+
+작업 통계:
+- **37 폴더 복제** (4 마스터 + 33 sub-skill)·**54,305 lines 신규**·**510 lines sed 치환** (vision-foresight-* prefix + SKILL_DIR 경로)
+- 외부 foresight-* 참조 20건 (delphi·expert-pool·cross-impact 등) *원본 그대로 보존*
+- 박사님 책 verbatim·외부 학자 인용·학술 용어 *변경 0건*
+- `vision-grill-with-docs/topic_skill_map.md` 영역 9 *미래학 도구* 신규 추가 — 7 키워드 라인 + Stage 매핑
+- 35 신규 symlink로 `~/.claude/skills/` 글로벌 등록 — 즉시 활용 가능
+
+검증·시뮬레이션:
+- 김민준(16세 고1)·박서연(12세 초6)·이수민(29세 청년 전환자) 3 페르소나 cross-orchestration PASS
+- 누적 단위 테스트 1,097+ PASS · 회귀 0건
+- 박사님 시그니처 도구 `vision-futures-timeline-map` 결함 0건 유지
+
+vision 시리즈 구조:
+- 사용자 직접 호출 가능 **마스터 32개** (vision 28 + vision-foresight 4)
+- INTERNAL sub-skill 33개 (vision-foresight 4 마스터 산하)
+- 총 65 폴더 + 결정론 모듈·박사님 책 verbatim 인용·할루시네이션 차단 절대 원칙 보존
+
+**2026-05-18 — vision-foresight 4 series integrated — Dr. Choi's futurist signature assets joined to vision pipeline with academic depth**
+
+Dr. Choi's signature assets (full implementation of *Millennium Project Futures Research Methodology V3.0* — 38 masters + 200+ sub-skills) — the 4 core series cloned with `vision-` prefix into cys-claude-vision-coaching-skills. **Original cys-claude-foresight-skills preserved as-is (filesystem untouched)**.
+
+- **`vision-foresight-environmental-scanning`** — STEEPS 6 domains·weak-signal detection·issues management·QUEST workshop → **academic foundation for Stages 1·2**
+- **`vision-foresight-futures-wheel`** — 1st·2nd·6th order consequence tracking·STEEPS 192 nodes → **academic backbone for Stage 2 future forecasting** (combined with `vision-four-futures`)
+- **`vision-foresight-wild-cards`** — Arlington Impact Index·Dr. Choi's Book ④ Unexpected Future → **Stages 2·3 crisis & game-changer preparation**
+- **`vision-foresight-scenarios`** — Schwartz GBN·Cone of Plausibility·9 methods (Dr. Choi's futurist signature method) → **Stage 5 vision starting point·big picture academic integration**
+
+Stats: 37 folders cloned · 54,305 lines added · 510 lines sed-substituted · 3-persona cross-orchestration PASS · 1,097+ unit tests cumulative · 0 regression. 32 user-callable masters (28 vision + 4 vision-foresight) + 33 INTERNAL sub-skills.
 
 **2026-05-18 — `vision-grill-with-docs`를 vision 시리즈 *마스터 진입 스킬*로 공식 지정 (E안)**
 - 박사님 결정: 마스터 진입 허브 신설(vision-start 안) 폐기 → `vision-grill-with-docs`가 이미 cross-stage 메타 인터뷰 엔진으로서 마스터 진입 자격을 갖췄음이 확인됨
@@ -254,18 +293,67 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 8. 미래비전 지속 셀프코칭 (자극·디자인·심층탐구·훈련·네트워킹·재생산)
 ```
 
-| 단계 / Stage | 박사님 단계명 / Stage | 사용 스킬 / Skills |
-|----------|-------------------|----------------|
-| **1** | Vision Coding — 내 안에 있는 것 파악 | 진단 7종 (아래 카탈로그) |
-| **2** | 나와 연관된 미래 예측 | `vision-personal-future-research` → `foresight-futures-wheel` → `vision-four-futures` → `vision-futures-timeline-map` (순차) |
-| **3** | 5가지 시대적 필요(문제·욕구·결핍·위기·기회) 발견 | `vision-future-needs-prediction` · `vision-future-promise-five-criteria` |
-| **4** | 마음을 사로잡는 가치 명확화 + 비전 열매 예상 | `vision-values-visioncoding` · `vision-three-realm-balance` |
-| **5** | "가치 + 시대적 필요 + 내 능력" 종합 — 비전 출발점·큰 그림 | `vision-clarity-coaching` · `vision-mission-frame` |
-| **6** | 비전선언문 작성 | `vision-statement-writer` |
-| **7** | 비전 성취 구체 설계 — 목표·전략·필요한 것 | `vision-goal-reframing` · `vision-strategy-coach` · `vision-financial-3shields-3windows` · `vision-financial-coach` · `vision-career-recommendation` |
-| **8** | 미래비전 지속 셀프코칭 — 자극·디자인·심층탐구·훈련·네트워킹·재생산 | `vision-five-stages` · `vision-smart-five-competence` · `vision-eight-training-areas` · `vision-follow-through-habits` · `vision-progress-review` |
+| 단계 / Stage | 박사님 단계명 / Stage | 사용 스킬 / Skills | 미래학 보강 / Foresight Augmentation |
+|----------|-------------------|----------------|---------------------|
+| **1** | Vision Coding — 내 안에 있는 것 파악 | 진단 7종 (아래 카탈로그) | `vision-foresight-environmental-scanning` — STEEPS 6영역 자기 외부 정보 스캔 |
+| **2** | 나와 연관된 미래 예측 | `vision-personal-future-research` → `vision-foresight-futures-wheel` → `vision-four-futures` → `vision-futures-timeline-map` (순차) | `vision-foresight-futures-wheel` (정통 골격) + `vision-foresight-wild-cards` (뜻밖의 미래) + `vision-foresight-scenarios` (통합 시나리오) |
+| **3** | 5가지 시대적 필요(문제·욕구·결핍·위기·기회) 발견 | `vision-future-needs-prediction` · `vision-future-promise-five-criteria` | `vision-foresight-environmental-scanning` (이슈 매니지먼트) + `vision-foresight-wild-cards` (위기·붕괴 시나리오) |
+| **4** | 마음을 사로잡는 가치 명확화 + 비전 열매 예상 | `vision-values-visioncoding` · `vision-three-realm-balance` | (Stage 4는 박사님 가치 진단 영역 — foresight 보강 적음) |
+| **5** | "가치 + 시대적 필요 + 내 능력" 종합 — 비전 출발점·큰 그림 | `vision-clarity-coaching` · `vision-mission-frame` | **`vision-foresight-scenarios`** (박사님 미래학자 본업 시그니처 — 통합 시나리오 학문적 골격) |
+| **6** | 비전선언문 작성 | `vision-statement-writer` | (Stage 6은 선언문 영역) |
+| **7** | 비전 성취 구체 설계 — 목표·전략·필요한 것 | `vision-goal-reframing` · `vision-strategy-coach` · `vision-financial-3shields-3windows` · `vision-financial-coach` · `vision-career-recommendation` | (Stage 7은 실행 설계 영역) |
+| **8** | 미래비전 지속 셀프코칭 — 자극·디자인·심층탐구·훈련·네트워킹·재생산 | `vision-five-stages` · `vision-smart-five-competence` · `vision-eight-training-areas` · `vision-follow-through-habits` · `vision-progress-review` | `vision-foresight-environmental-scanning` 주기적 재실행 — 사용자 환경 변화 모니터링 |
 
 > 참고: 본 8단계 표는 박사님이 명시한 *순서가 의미 있는* 표이므로 빌드 스크립트 자동 갱신 대상에서 제외됩니다. 새 스킬을 단계에 편입할 때 직접 편집하세요.
+
+### 🔬 vision-foresight 4 시리즈 — 박사님 단계별 결합 원리 / Stage-Integration Rationale
+
+박사님 미래학자 본업 자산을 *기존 vision 시리즈와 충돌·중복 없이* 조화롭게 결합하는 설계 철학:
+
+**원리 1 — `vision-foresight`는 *학문적 골격*, `vision-*`은 *박사님 코칭 흐름***
+
+박사님 vision 시리즈는 박사님 책 『미래준비학교』(2016)의 *코칭 흐름·인터뷰 패턴·결과 산출*에 최적화됨. 반면 vision-foresight 4 시리즈는 *Millennium Project FRM V3.0*의 *학문적 방법론·결정론 산출*에 최적화됨. 두 시리즈는 *겹치지 않는 짝*으로 작동.
+
+```
+Stage 2 예시:
+  ┌─ vision-personal-future-research      ← 박사님 인터뷰·자기 미래 연구 (코칭)
+  ├─ vision-foresight-futures-wheel        ← Glenn 1971 학문 방법 (정통 골격)
+  ├─ vision-four-futures                   ← 박사님 4가지 미래 분류 (코칭)
+  ├─ vision-foresight-wild-cards           ← Petersen·Steinmüller (학문 — Wildcard 보강)
+  ├─ vision-foresight-scenarios            ← Glenn·TFG 19장 (학문 — 통합 시나리오)
+  └─ vision-futures-timeline-map           ← 박사님 미래지도 (코칭 — 시간축 완성)
+```
+
+**원리 2 — `vision-foresight-scenarios`는 박사님 시그니처 method의 학문적 표현**
+
+Stage 5 *"가치 + 시대적 필요 + 내 능력" 종합 → 비전 출발점·큰 그림* 단계에서 박사님 책의 *통합 시나리오* 작성이 핵심. 이 단계에서 `vision-foresight-scenarios`(Glenn·TFG 19장 풀 구현)가 학문적 골격을 제공:
+- Schwartz GBN 6 steps (focal issue·driving forces·importance/uncertainty·logics·key measures·implications)
+- Cone of Plausibility (Charles W. Taylor 1993)
+- 9 methods catalogue (Coates-Jarratt·Godet MOPPHOL·Schwartz·Von Reibnitz·Bishop 등)
+
+박사님 `vision-clarity-coaching`(소크라테스 산파술)·`vision-mission-frame`(영적 직관력+이성적 판단력 R 피드백)이 *박사님 코칭 흐름*을 제공하고, `vision-foresight-scenarios`가 그 *학문적 검증 도구*로 작동.
+
+**원리 3 — `vision-foresight-environmental-scanning`은 Stage 1·8을 잇는 *주기적 도구***
+
+박사님 Stage 1 진단 7종이 *최초 자기 인식*이라면, Stage 8 *지속 셀프코칭*은 *주기적 재진단*. 두 단계 모두 *환경 변화 외부 정보 수집*이 필요하고, `vision-foresight-environmental-scanning`이 STEEPS 6영역·약한 신호·이슈 매니지먼트 학문 도구로 *주기적으로 자동 호출*되는 백본 역할.
+
+**원리 4 — `vision-foresight-wild-cards`는 *박사님 책 ④ 뜻밖의 미래* 학문적 보강**
+
+박사님 책 미래지도 4 고려사항 중 *④ 예상치 못한 것 (비약적 진보·붕괴)*를 학문적으로 풀어낸 것이 `vision-foresight-wild-cards` (Petersen·Steinmüller). Arlington Impact Index(ΔC+R+V+O+T+Op+P=I_AI, 범위 1-24)로 wildcard 영향도 결정론 산출. Stage 2 미래 예측·Stage 3 위기 식별·Stage 8 지속 모니터링 모두에서 활용.
+
+**원리 5 — `vision-grill-with-docs` Mode C/D가 *자동 cross-call 라우터***
+
+사용자가 *미래·시나리오·환경 스캔·wildcard* 키워드를 발화하면 `vision-grill-with-docs`의 `topic_skill_map.md` 영역 9가 즉시 매칭하여 적합한 vision-foresight 스킬로 *자동 cross-call*. 박사님 메모리 *대표 스킬 + 하위 스킬 절대 protocol*과 정합 — 사용자는 단일 진입점(`vision-grill-with-docs`)에 입장하면 시스템이 알아서 *vision + vision-foresight* 두 시리즈를 cross-orchestration.
+
+### 📊 페르소나별 활용 예시 / Persona Use Cases
+
+3 페르소나로 검증된 cross-orchestration:
+
+| 페르소나 | 주 활용 vision-foresight 스킬 | 결합 효과 |
+|---|---|---|
+| **고1 김민준** (이공계 잠재·미국 유학 계획) | `environmental-scanning` + `scenarios` + `futures-wheel` | STEEPS로 *기술·산업 변화* 스캔 → futures-wheel로 *AGI 시대 진로 영향* 1차/2차 추적 → scenarios로 *15년 후 유학·진로 통합 시나리오* |
+| **초6 박서연** (그림+과학 양다리·진로 미정) | `wild-cards` + `futures-wheel` | wild-cards로 *AI 시대 직업 변화* 영향도 평가 → futures-wheel로 *공간지능·논리수학 강점이 미래 직업에 어떻게 적용되는지* 추적 |
+| **29세 이수민** (카피라이터 → 데이터 사이언티스트 전환) | `scenarios` + `environmental-scanning` | scenarios로 *전환 후 5년 시나리오 4가지* (성공·실패·중간 진로 변경·미래 산업 변동) → environmental-scanning으로 *데이터 사이언스 직업 시장 약한 신호 모니터링* |
 
 ---
 
@@ -277,7 +365,7 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 ### 📊 6대 카테고리 / Six Categories
 
 <!-- AUTO:CATEGORY_TABLE -->
-| # | 카테고리 / Category | 스킬 수 | 박사님 8단계 |
+| # | 카테고리 / Category | 마스터 수 | 박사님 8단계 |
 |---|------------------|--------|--------------|
 | 1 | **Vision Coding - 진단 (Diagnosis)** | 7 | 1단계 |
 | 2 | **박사님 책 토대 — 척추 도식 (Spine)** | 5 | 5·6·8단계 |
@@ -285,7 +373,10 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 | 4 | **처방·실행 (Prescription)** | 7 | 5·7·8단계 |
 | 5 | **메타 인터뷰 (Cross-stage) (Meta-Interview)** | 1 | 전 단계 |
 | 6 | **데이터 백본 (External API) (Data Backbone)** | 1 | 1·3·7단계 보조 |
-| | **합계** | **28** | |
+| 7 | **미래학 도구 (Foresight Methodology — Millennium FRM V3.0)** | 4 | 1·2·3·5·8단계 학문적 보강 |
+| | **마스터 합계** | **32** | |
+| + | INTERNAL sub-skill (vision-foresight 4 시리즈 산하) | 33 | (마스터에 종속) |
+| | **총 폴더** | **65** | |
 <!-- /AUTO:CATEGORY_TABLE -->
 
 ### 📋 전체 스킬 인덱스 / Skill Index (auto-generated)
@@ -321,6 +412,10 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 | Prescription | `vision-progress-review` | 8 | 사용자의 비전·목표·행동 계획 진척을 주간·월간·분기·연간 4단위 정기 점검으로 추적·평가·재조정하는 진척 추적 스킬. 결정론… |
 | Meta-Interview | `vision-grill-with-docs` | — | 미래비전코칭의 모든 단계에서 사용자가 난관에 부딪히거나 생각이 정리되지 않을 때 호출하는 다목적 인터뷰 엔진 스킬. Matt… |
 | Data Backbone | `vision-school-major-info` | 1·3·7 | 한국 대학·학과·진로 정보(공공데이터포털 7개 API 통합)와 미국 직업 정보(ONET)를 결정론적으로 조회·매핑·진로 추천에… |
+| Foresight | `vision-foresight-environmental-scanning` | 1·3·8 | Gordon·Glenn FRM V3.0 02장 풀 구현 — STEEPS 6영역·약한 신호·이슈 매니지먼트·QUEST 워크숍 + 5 sub-skill |
+| Foresight | `vision-foresight-futures-wheel` | 2 | Glenn 1971 FRM V3.0 06장 풀 구현 — 1차→6차 결과 추적·STEEPS 192 노드·박사님 7 protocol + 9 sub-skill |
+| Foresight | `vision-foresight-wild-cards` | 2·3·8 | Petersen·Steinmüller FRM V3.0 10장 풀 구현 — Arlington Impact Index·박사님 책 ④ 뜻밖의 미래 + 7 sub-skill |
+| Foresight | `vision-foresight-scenarios` ★ | 2·5 | Glenn·TFG FRM V3.0 19장 풀 구현 (박사님 미래학자 본업 시그니처) — Schwartz GBN·Cone of Plausibility·9 methods + 12 sub-skill |
 <!-- /AUTO:SKILL_INDEX -->
 
 ### 🔗 박사님 8단계 ↔ 스킬 흐름도 / 8-Stage Flow Diagram
@@ -682,27 +777,45 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 - **STEEPS** + 미래 형상 3요소
 - **8단계 매칭**: *3단계 (시대적 필요 발견)* — 미래 변화에서 5가지 필요(문제·욕구·결핍·위기·기회) 도출
 
-### 2단계 미래 예측 — 박사님 권장 순차 흐름
+### 2단계 미래 예측 — 박사님 권장 순차 흐름 (vision-foresight 4 시리즈 통합)
 
-박사님이 직접 정리하신 2단계 *4스킬 순차 사용*:
+박사님이 직접 정리하신 2단계 *4스킬 순차 사용* + vision-foresight 학문적 보강:
 
 ```
 [1단계 진단 7종 결과 입력]
      ↓
-① vision-personal-future-research
-   → 진단 7종 결과로 *나와 연관된* 미래 변화 매트릭스 추출
+[옵션 — Stage 1·2 연결] vision-foresight-environmental-scanning
+   → STEEPS 6영역 자기 외부 환경 스캔 (Gordon·Glenn 2009 02장)
+   → 약한 신호·이슈 매니지먼트로 사용자 환경 컨텍스트 결정론 추출
      ↓
-② foresight-futures-wheel
-   → 핵심 변화 1~2개로 1차→2차→3차→4차→고차 영향 추론
+① vision-personal-future-research
+   → 진단 7종 결과로 *나와 연관된* 미래 변화 매트릭스 추출 (박사님 코칭)
+     ↓
+② vision-foresight-futures-wheel ★ (정통 골격)
+   → Glenn 1971 Futures Wheel — 핵심 변화 1~2개로 1차→2차→3차→4차→6차 영향 추론
+   → 박사님 2026-05-11 강화 7 protocol — STEEPS 6 6차에서 192 senary 노드
+   → 박사님 결정론 모듈 wheel_math.py·deep_reasoning_engine·SCBE 9 Cycle
      ↓
 ③ vision-four-futures
-   → Plausible/Possible/Wildcard/Normative 4가지 미래 가능성 분류
+   → Plausible/Possible/Wildcard/Normative 4가지 미래 가능성 분류 (박사님 코칭)
+     ↓
+[옵션 — Wildcard 학문 보강] vision-foresight-wild-cards
+   → Petersen·Steinmüller — Arlington Impact Index (ΔC+R+V+O+T+Op+P=I_AI, 1-24)
+   → 박사님 책 ④ 뜻밖의 미래 (비약적 진보 quantum progress + 붕괴 collapse) 학문적 표현
+   → 78 Petersen + 55 Steinmüller catalogue 결정론 lookup
      ↓
 ④ vision-futures-timeline-map
-   → 단기·중기·장기 시간축 미래지도 *완성*
+   → 단기·중기·장기 시간축 미래지도 *완성* (박사님 시그니처 도구)
+     ↓
+[Stage 5 진입 시] vision-foresight-scenarios ★ (박사님 미래학자 본업 시그니처)
+   → Glenn·TFG 19장 — 700+ scenario bibliography·Schwartz GBN 6 steps
+   → Cone of Plausibility (Charles W. Taylor 1993) + 9 methods catalogue
+   → Stage 5 *"가치 + 시대적 필요 + 내 능력" 종합 → 통합 시나리오* 학문적 골격
      ↓
 [3단계로 — 5가지 시대적 필요 발견]
 ```
+
+**조화 원리**: vision-* 스킬이 *박사님 코칭 흐름*을 담당하고, vision-foresight-* 4 시리즈가 *학문적 골격·결정론 검증*을 담당. 두 시리즈는 *중복 없이 짝*으로 작동하여 박사님 8단계 흐름을 *코칭 + 학문* 양축으로 동시 지원.
 
 ### 처방·실행 (7)
 일반 코칭 도구 — 7~8단계에 활용
@@ -788,13 +901,76 @@ Dr. Choi's 8-stage flow for vision discovery·fulfillment. Skills follow this ex
 
 ---
 
+### 🔬 미래학 도구 / Foresight Methodology (4 vision-foresight 마스터 + 33 sub-skill)
+
+박사님 미래학자 본업의 *Millennium Project Futures Research Methodology V3.0* 풀 구현 자산에서 핵심 4 시리즈를 vision pipeline에 통합. 원본 cys-claude-foresight-skills는 변경 없이 보존하고, vision-* 접두사로 복제·rename된 4 마스터 + 33 sub-skill이 본 패키지에 포함됨.
+
+#### 7.1 vision-foresight-environmental-scanning (5 sub-skill)
+- **저자·원전**: Gordon·Glenn, Millennium Project FRM V3.0 02장 (2009)
+- **핵심 도구**: STEEPS 6영역 환경 스캔·약한 신호(Weak Signal) 탐지·이슈 매니지먼트·QUEST 워크숍·9 domains·23 techniques matrix
+- **결정론 모듈**: `env_scanning_calc.py` + sub-skill 결정론 5종 (`_helpers.py`·`scanning_taxonomy_deep.md`·`auto_orchestration_workflows.md` 등)
+- **박사님 8단계 매칭**:
+  - **1단계 Vision Coding 보조** — 자기 외부 정보 (박사님 책 *비전 프레임* 정보 축 ③) 학문적 수집
+  - **3단계 시대적 필요 발견** — 이슈 매니지먼트 + 약한 신호로 *미래에 닥칠 5가지 (문제·욕구·결핍·위기·기회)* 결정론 추출
+  - **8단계 지속 셀프코칭** — 주기적 재실행으로 사용자 환경 변화 모니터링
+
+#### 7.2 vision-foresight-futures-wheel (9 sub-skill)
+- **저자·원전**: Glenn (1971 Antioch Graduate School), FRM V3.0 06장 (2009) — 박사님 2026-05-11 7 protocol 강화
+- **핵심 도구**: 1차→2차→6차 결과 추적·STEEPS 6 senary 192 노드·Categorical Binary Expansion (SCBE) + Deep Reasoning Engine
+- **결정론 모듈**: `wheel_math.py` + sub-skill 결정론 9종 (basic-v1·domain-v2·temporal-v3·delphi-rounds·consequence-linker·scenario-forecast 등)
+- **9 Cycle**: C1 Basic·C2 Domain·C3 Temporal·C4 Delphi·C5 Consequence·C6 Scenario·C7 Quality·C8 Forecast·C9 SCBE
+- **박사님 8단계 매칭**:
+  - **2단계 미래 예측의 정통 골격** — 박사님 권장 순차 흐름 ②번 위치 (vision-personal-future-research 결과를 받아 1차→고차 영향 추론)
+  - **vision-four-futures와 짝** — futures-wheel이 *연쇄 영향*, four-futures가 *4가지 미래 분류*로 cross-orchestration
+
+#### 7.3 vision-foresight-wild-cards (7 sub-skill)
+- **저자·원전**: Petersen & Steinmüller, FRM V3.0 10장 (2009) — 1970s Pierre Wack Royal Dutch Shell 기원
+- **핵심 도구**: Arlington Impact Index (ΔC+R+V+O+T+Op+P=I_AI, 범위 1-24)·Petersen Pyramid (Being·Sustenance·Actions·Tools·Power 1-4)·78 Petersen + 55 Steinmüller catalogue
+- **결정론 모듈**: `arlington_calculator.py`·`factor_scale_validator.py`·`timing_windows.py`·`signal_id_generator.py`·`tripwire_evaluator.py` 등
+- **5 식별 방법**: brainstorming·expert panel·survey·historical·science fiction
+- **박사님 8단계 매칭**:
+  - **2단계 미래 예측의 ④ Wildcard 학문적 보강** — 박사님 책 미래지도 4 고려사항 중 *④ 예상치 못한 것 (비약적 진보 quantum progress + 붕괴 collapse)* 학문적 표현
+  - **3단계 시대적 필요 — 위기 영역** — 게임체인저급 위기 시나리오 결정론 식별·평가·모니터링
+  - **8단계 지속 모니터링** — Tripwire·Foresight Factor A-F·Quality Factor (+/-/±) 결정론 추적
+
+#### 7.4 vision-foresight-scenarios (12 sub-skill) ★ 박사님 미래학자 본업 시그니처
+- **저자·원전**: Glenn & The Futures Group International, FRM V3.0 19장 (2009) — 가장 풍부한 chapter (54페이지)
+- **역사**: Herman Kahn 1950s RAND → Shell 1973 oil shock → Schwartz GBN *Art of Long View* 1991 → Millennium Project 700+ scenario bibliography
+- **핵심 인용 verbatim**: *"A scenario is a story with plausible cause and effect links that connects a future condition with the present, while illustrating key decisions, events, and consequences throughout the narrative."*
+- **3 "Good" criteria**: Plausible (causal explicit) + Internally consistent + Sufficiently interesting (elicit strategic responses)
+- **TFG 3-step**: Preparation (focal issue·driving forces·MITRE 4-quadrant) → Development (key measures·events·projection·narrative) → Reporting (top-line + detail·implications·policy testing)
+- **Schwartz GBN 6 steps**: focal issue → driving forces → importance/uncertainty ranking → scenario logics → fill out → implications → leading indicators
+- **9 methods catalogue**: Coates-Jarratt·Mandel-Wilson SRI·Godet MOPPHOL·Parmenides EIDOS·Von Reibnitz 1988·Institute Futures Research·Millennium Participatory·Bishop 4-6hr
+- **Section V Frontiers**: Charles W. Taylor 1993 *Cone of Plausibility* (U.S. Army War College Chemtech 4 themes·wildcards outside cone)
+- **결정론 모듈**: `scenarios_engine.py` + sub-skill 결정론 12종 (focal-issue-definition·driving-forces-identification·importance-uncertainty-ranking·scenario-logics-selection·key-measures-events·projection-engine·narrative-writing·internal-consistency-check·cone-of-plausibility·policy-testing·leading-indicators·implications-synthesis)
+- **10 Cycle**: C1 TFG 3-step DEFAULT·C2 Schwartz GBN·C3 Coates-Jarratt·C4 Godet MOPPHOL·C5 Von Reibnitz·C6 Millennium Participatory·C7 Bishop Workshop·C8 Cone of Plausibility·C9 Hybrid·C10 Full
+- **박사님 8단계 매칭**:
+  - **2단계 미래 예측의 통합 시나리오 골격** — vision-four-futures와 결합하여 *Plausible/Possible/Wildcard/Normative 4가지 미래*를 학문적으로 풀어냄
+  - **5단계 비전 출발점·큰 그림의 학문적 골격** — 박사님 책 *"가치 + 시대적 필요 + 내 능력" 종합* 단계에서 통합 시나리오 작성을 결정론 12 sub-skill로 보강
+  - **박사님 시그니처 method** — 박사님 미래학자 본업이 직접 사용하시는 핵심 도구
+
+#### 미래학 도구 조화 원리 종합
+
+| 원리 | 설명 |
+|---|---|
+| **학문 + 코칭 양축** | vision-foresight-*는 *학문적 골격·결정론 검증*, vision-*는 *박사님 코칭 흐름·인터뷰 패턴*. 중복 없이 짝으로 작동 |
+| **박사님 책 verbatim 보존** | 원전 chapter·저자명·인용은 폴더명 rename에도 그대로 보존. 외부 학자 인용·학술 용어 변경 0건 |
+| **결정론 환원 절대 원칙** | 4 시리즈 모두 결정론 모듈 + 단위 테스트 보유 — 박사님 vision 시리즈 핵심 protocol과 정합 |
+| **vision-grill-with-docs 자동 cross-call** | Mode C/D에서 미래·시나리오·환경 스캔·wildcard 키워드 매칭 시 자동 추천 (topic_skill_map.md 영역 9) |
+| **vision-futures-timeline-map과 cross-orchestration** | 박사님 시그니처 도구 vision-futures-timeline-map(미래지도)이 vision-foresight 4 시리즈 결과를 *시간축 통합 완성*으로 결합 |
+
+---
+
 ### 🔧 외부 시리즈 연계 / External Series Integration
 
 본 패키지는 박사님의 다른 시리즈와 연계 가능:
 
-#### foresight-* 시리즈 (미래 예측)
-- `foresight-futures-wheel` — 박사님 8단계 *2단계 (미래 예측)*의 ② 위치, 핵심 변화의 1차→고차 영향 추론에 사용
+#### foresight-* 시리즈 (미래 예측) — 외부 원본
+- 원본 cys-claude-foresight-skills repo — Millennium Project FRM V3.0 38 마스터 + 200+ sub-skill 풀 구현
+- 본 패키지에는 *4 시리즈만 복제*되어 있고 (위 7.1~7.4), 나머지는 외부 시리즈로 활용
 - `foresight-socratic-critical-thinking` — 비전 비판적 검증 시 활용
+- `foresight-causal-layered-analysis` (Inayatullah 35장) — 4 레이어 (Litany·Systemic·Worldview·Myth-Metaphor) 분석
+- `foresight-vision-method` (IAF Bezold 27장) — 외부 미래학 vision method (박사님 vision 시리즈와 *별개*)
 
 #### sermon-* 시리즈 (설교 — 박사님 담임목사 활용)
 - 본 vision-* 시리즈와 별도 시리즈
