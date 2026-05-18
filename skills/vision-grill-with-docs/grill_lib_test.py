@@ -394,10 +394,11 @@ def test_slug_normalize():
 
 def test_menu_options():
     m = grill_lib.menu_options()
-    expect("menu 3 modes", len(m["modes"]) == 3)
+    expect("menu 4 modes (D 추가)", len(m["modes"]) == 4)
     mode_keys = [mo["key"] for mo in m["modes"]]
-    for k in ("A", "B", "C"):
+    for k in ("D", "A", "B", "C"):
         expect(f"menu mode {k}", k in mode_keys)
+    expect("menu D 첫 위치 (마스터 진입)", mode_keys[0] == "D")
     expect("menu tools list", len(m["tools_available"]) >= 5)
 
 
@@ -580,54 +581,83 @@ def test_validate_ldr_chain():
 
 def test_route_intake():
     """E안 마스터 진입 — 한 문장 자유 답 → 진입 스킬 라우팅."""
-    # 빈 입력 → 메뉴
+    # 빈 입력 → 메뉴 (cascade 무관)
+    grill_lib.track_user_state(action="reset")
     out = grill_lib.route_intake("")
     expect("intake 빈 입력 → menu", out["mode"] == "menu" and "guidance" in out)
     expect("intake guidance 예시 포함", "처음입니다" in out["guidance"])
 
-    # 박사님 본인
+    # ★ CASCADE 검증: 1차 사용자(visit_count=0·진단 없음)는 발화 무관 cys-competence로 라우팅
+    grill_lib.track_user_state(action="reset")
+    out = grill_lib.route_intake("진로·전공·학교 결정해야 합니다")
+    expect("intake cascade 1차 사용자 → cys-competence",
+           out["next_skill"] == "vision-cys-competence-visioncoding")
+    expect("intake cascade mode=intake", out["mode"] == "intake")
+    expect("intake cascade note 1차 표기", "1차 사용자" in out["note"])
+
+    # 첫 입장 명시 발화도 cascade로 처리
+    grill_lib.track_user_state(action="reset")
+    out = grill_lib.route_intake("처음입니다 어디서부터 시작해야 할지")
+    expect("intake 첫 입장 → cys-competence", out["next_skill"] == "vision-cys-competence-visioncoding")
+
+    # ★ 반복 사용자 setup — 이후 케이스는 cascade 건너뛰고 priority 로직으로 분기
+    def _setup_repeat_user():
+        grill_lib.track_user_state(action="reset")
+        grill_lib.track_user_state(action="increment_visit")
+        grill_lib.track_user_state(action="increment_visit")
+        grill_lib.track_user_state(action="mark_completed", skill="vision-cys-competence-visioncoding")
+
+    # 박사님 본인 (explicit_override — cascade 우회·반복 사용자 setup 불필요)
+    grill_lib.track_user_state(action="reset")
     out = grill_lib.route_intake("박사님 본인 미래학자 본업 5년 집중")
     expect("intake 박사님 본인 → Mode A", out["mode"] == "A")
     expect("intake 박사님 본인 → mission-frame", out["next_skill"] == "vision-mission-frame")
 
-    # 진학·학교 키워드는 career 영역으로 라우팅 (현실적·정확)
+    # 진학·학교 키워드는 career 영역으로 라우팅 (반복 사용자)
+    _setup_repeat_user()
     out = grill_lib.route_intake("신학교 진학 결단 앞두고 가족이 반대")
     expect("intake 결단 → Mode C", out["mode"] == "C")
     expect("intake 진학 키워드 → school-major-info (career 영역)",
            out["next_skill"] == "vision-school-major-info")
 
     # 순수 사역 영역 → mission-frame
+    _setup_repeat_user()
     out = grill_lib.route_intake("선교 헌신·전임 사역 결단")
     expect("intake 순수 사역 → mission-frame", out["next_skill"] == "vision-mission-frame")
 
     # 영역 명시 없는 큰 결정 → stuck_decision으로 grill-with-docs
+    _setup_repeat_user()
     out = grill_lib.route_intake("큰 결정 앞에서 막혔어요")
     expect("intake 영역 모호 결정 → grill-with-docs", out["next_skill"] == "vision-grill-with-docs")
 
     # 진로 영역
+    _setup_repeat_user()
     out = grill_lib.route_intake("진로·전공·학교 결정해야 합니다")
     expect("intake 진로 → school-major-info", out["next_skill"] == "vision-school-major-info")
 
     # 재정 영역
+    _setup_repeat_user()
     out = grill_lib.route_intake("재정 큰 결정 — 집 매수 고민")
     expect("intake 재정 → financial-3shields", out["next_skill"] == "vision-financial-3shields-3windows")
 
-    # 첫 입장 (박사님 책 공식 진단부터)
-    out = grill_lib.route_intake("처음입니다 어디서부터 시작해야 할지")
-    expect("intake 첫 입장 → cys-competence", out["next_skill"] == "vision-cys-competence-visioncoding")
-
     # 미래 시뮬레이션
+    _setup_repeat_user()
     out = grill_lib.route_intake("5년 후 10년 후 미래 모습 시뮬레이션")
     expect("intake 미래 → futures-timeline-map", out["next_skill"] == "vision-futures-timeline-map")
 
     # 사역 헌신
+    _setup_repeat_user()
     out = grill_lib.route_intake("선교사 헌신을 앞두고 있어요")
-    # career·ministry·stuck_decision 다 매칭 가능 — stuck_decision이 우선
+    # career·ministry·stuck_decision 다 매칭 가능
     expect("intake 사역 헌신 매칭", len(out["matched_categories"]) >= 1)
 
     # 매칭 없음 → 기본 Mode C
+    _setup_repeat_user()
     out = grill_lib.route_intake("아무거나 외계어 zzz")
     expect("intake 매칭 없음 → Mode C 기본", out["mode"] == "C")
+
+    # cleanup
+    grill_lib.track_user_state(action="reset")
 
 
 def test_decide_first_skill():

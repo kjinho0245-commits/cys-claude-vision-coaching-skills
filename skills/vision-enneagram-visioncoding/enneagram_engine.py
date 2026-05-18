@@ -607,22 +607,38 @@ def cmd_parse_scores(args):
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
+USAGE = """사용법: enneagram_engine.py <command> [args]
+commands:
+  shuffle [seed]       : 9유형 질문 순서 결정론 셔플
+  questions [ko|en|zh] : 질문지 출력 (언어 선택)
+  score                : stdin JSON 점수 → 주 유형·날개 결정
+  lookup <primary> [wing] : 유형 정보 lookup
+  detect               : stdin text → 유형 추정
+  parse_scores         : stdin text → 점수 파싱
+  -h, --help           : 본 도움말
+"""
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("사용법: enneagram_engine.py <command> [args]")
-        print("commands: shuffle [seed] | questions [ko|en|zh] | score (stdin JSON) | "
-              "lookup <primary> [wing] | detect (stdin text) | parse_scores (stdin text)")
-        sys.exit(1)
+    # G10 #36: --help/-h 분기 + 모르는 명령 친화 에러 (KeyError 차단)
+    if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help", "help"}:
+        print(USAGE)
+        sys.exit(0 if len(sys.argv) >= 2 else 1)
     cmd = sys.argv[1]
     args = sys.argv[2:]
-    {
+    handlers = {
         "shuffle": cmd_shuffle,
         "questions": cmd_questions,
         "score": cmd_score,
         "lookup": cmd_lookup,
         "detect": cmd_detect,
         "parse_scores": cmd_parse_scores,
-    }[cmd](args)
+    }
+    if cmd not in handlers:
+        print(f"ERROR: unknown command '{cmd}'\n", file=sys.stderr)
+        print(USAGE, file=sys.stderr)
+        sys.exit(2)
+    handlers[cmd](args)
 
 
 if __name__ == "__main__":

@@ -12,13 +12,27 @@ LLM 자연어 추론에서 분리된 결정론 함수들:
 - validate_budget_data: 입력 데이터 검증 (음수·합 검증)
 - emergency_fund_recommended_months: 사용자 유형별 권장 응급자금 개월수 결정
 
-CLI 사용:
-  python3 financial_calc.py snowball '[{"name":"A","balance":1000,"rate":0.025,"min":20}]' 40
-  python3 financial_calc.py avalanche '[{"name":"A","balance":1000,"rate":0.025,"min":20}]' 40
-  python3 financial_calc.py tax 9000000 5500
-  python3 financial_calc.py emergency 3000000 6
-  python3 financial_calc.py budget 5000000
-  python3 financial_calc.py classify '[{"name":"카드","rate":0.199}]'
+CLI 사용 (각 인자 의미 명시):
+  # snowball/avalanche: [<부채 JSON>] <월 추가 상환액(원)>
+  python3 financial_calc.py snowball '[{"name":"A","balance":1000000,"rate":0.025,"min":20000}]' 40000
+  python3 financial_calc.py avalanche '[{"name":"A","balance":1000000,"rate":0.025,"min":20000}]' 40000
+
+  # tax: <연간 납입액(원)> <연소득(만원 단위 — 5500=5,500만원)> [self|salaried]
+  # 한도: 연금저축+IRP 합산 900만원. 13.2%/16.5% 환급률은 연소득으로 결정.
+  python3 financial_calc.py tax 9000000 5500           # 9백만원 납입·연소득 5,500만원·근로
+  python3 financial_calc.py tax 9000000 4500 self      # 자영업 (한도 4,500만원)
+
+  # emergency: <월 평균 지출(원)> <user_type — salaried|young_high_debt|self_employed|retiree>
+  # ※ 두 번째 인자는 개월수가 아닌 user_type 키워드. 권장 개월수는 user_type별 자동 결정.
+  python3 financial_calc.py emergency 3000000 salaried        # 일반 직장인 → 3~6개월
+  python3 financial_calc.py emergency 3000000 self_employed   # 자영업 → 8개월 (Suze Orman 권장)
+
+  # budget: <월 소득(원)> [tithe]
+  python3 financial_calc.py budget 5000000             # 50/30/20 분배
+  python3 financial_calc.py budget 5000000 tithe       # 십일조 변형
+
+  # classify: [<부채 JSON — balance·rate 필수>]
+  python3 financial_calc.py classify '[{"name":"카드","balance":3000000,"rate":0.199}]'
 """
 import json
 import sys
@@ -209,6 +223,17 @@ def tax_credit_calc(
 
     Returns: {capped_amount, rate, refund, exceeded}
     """
+    # G3 #22: 인자 단위 검증 — salary는 *만원 단위*. 5,500,000 같은 원 단위 오입력 차단.
+    # 한국 실질 상한: 일반 근로자 연소득 ~3억(=30,000만), 임원·고소득은 5억(50,000만)까지.
+    # 100,000만원(=10억원) 초과는 거의 오입력으로 간주하여 명시적 경고.
+    if annual_salary_manwon > 100_000:
+        raise ValueError(
+            f"annual_salary_manwon={annual_salary_manwon}은 *만원 단위* 입력입니다. "
+            f"원 단위로 입력하신 것 같습니다. 예: 5,500만원 → 5500 (NOT 55000000)"
+        )
+    if annual_salary_manwon < 0:
+        raise ValueError(f"annual_salary_manwon은 음수일 수 없습니다: {annual_salary_manwon}")
+
     LIMIT = 9_000_000  # 합산 900만원
     capped = min(contribution, LIMIT)
     exceeded = max(0, contribution - LIMIT)
@@ -330,9 +355,17 @@ def categorize_debts(debts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     중성: 연 4% 이상 10% 미만 — 자동차·일반 신용대출
     양성: 연 4% 미만 — 학자금·주담대
     """
+    # G3 #23: balance 누락 시 default 0 + 친화 에러 (rate·name은 필수)
     result = []
-    for d in debts:
+    for i, d in enumerate(debts):
+        if "rate" not in d:
+            raise ValueError(
+                f"debts[{i}]: 'rate' 필드 필수 (연 이자율, 0.0~1.0). 예: 0.199 = 19.9%"
+            )
+        if "name" not in d:
+            raise ValueError(f"debts[{i}]: 'name' 필드 필수 (부채 이름)")
         rate = float(d["rate"])
+        balance = float(d.get("balance", 0))  # balance 누락 시 0 (분류만 필요한 케이스)
         if rate >= 0.10:
             tier = "악성 (High-Interest) — 최우선 청산"
         elif rate >= 0.04:
@@ -341,7 +374,7 @@ def categorize_debts(debts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             tier = "양성 — 마지막 청산 (학자금·주담대 등)"
         result.append({
             "name": d["name"],
-            "balance": d["balance"],
+            "balance": balance,
             "rate": rate,
             "rate_pct": f"{rate*100:.2f}%",
             "tier": tier,
@@ -426,9 +459,10 @@ def _print_json(obj):
 
 
 def main():
-    if len(sys.argv) < 2:
+    # G2 #24: --help·-h·help 표준 분기 추가
+    if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help", "help"}:
         print(__doc__)
-        sys.exit(1)
+        sys.exit(0 if len(sys.argv) >= 2 else 1)
     cmd = sys.argv[1]
 
     if cmd == "snowball":
@@ -479,4 +513,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # G3: ValueError 친화 에러 메시지로 변환 (#22 입력 단위 검증 등)
+    try:
+        main()
+    except ValueError as e:
+        sys.stderr.write(f"ERROR: {e}\n")
+        sys.exit(2)
+    except (KeyError, json.JSONDecodeError) as e:
+        sys.stderr.write(f"ERROR: 입력 형식 오류 — {e}\n")
+        sys.stderr.write("도움말: python3 financial_calc.py --help\n")
+        sys.exit(2)

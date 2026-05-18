@@ -1162,9 +1162,15 @@ def slug_normalize(title: Any, max_len: int = 60) -> dict:
 
 MENU = {
     "modes": [
+        {"key": "D", "label": "마스터 진입 (Intake-Router) — vision 시리즈 첫 입장", "examples": [
+            "처음입니다. 어디서부터 시작해야 할지 모르겠어요",
+            "고1인데 비전코칭 받고 싶어요. 고교학점제·전공·유학까지 봐야 합니다",
+            "신학교 진학 결단 — 가족 반대 중",
+            "박사님 본인 미래학자 본업 5년 집중 계획",
+        ]},
         {"key": "A", "label": "비전 grill (1:1 인터뷰)", "examples": ["me", "coachee:김도현", "내 비전 무너뜨려봐"]},
         {"key": "B", "label": "vision 산출물 메타 검증", "examples": ["verify mission-frame", "verify three-realm-balance"]},
-        {"key": "C", "label": "다목적 주제 인터뷰 (메인 진입로)", "examples": [
+        {"key": "C", "label": "다목적 주제 인터뷰", "examples": [
             "나의 역량·실력·미래 비전 가능성을 종합해서 진로 결정. 전공·학교 코칭",
             "집을 살까 말까", "선교지로 갈까 말까",
             "비전이 막혀있다. 생각 정리부터",
@@ -1176,6 +1182,8 @@ MENU = {
         "3영역 균형 검사",
         "시나리오 4종 강제 확장 (5년·10년·실패·기회비용)",
         "박사님 인용 검증 (할루시네이션 차단)",
+        "사용자 회차·완료 단계 추적 (track_user_state)",
+        "1차 사용자 자동 진입 스킬 결정 (decide_first_skill)",
     ],
 }
 
@@ -1198,18 +1206,31 @@ USER_STATE_PATH = os.path.expanduser("~/.config/vision-grill-with-docs/user_stat
 
 
 INTAKE_KEYWORDS = {
-    # 자기인식 미진단 — 첫 사용자
-    "first_visit": ["처음", "처음입니다", "어디서 시작", "어디부터", "시작", "입학"],
+    # 자기인식 미진단 — 첫 사용자 (학년·신규 코칭 요청 신호 추가)
+    "first_visit": [
+        "처음", "처음입니다", "어디서 시작", "어디부터", "시작", "입학",
+        "코칭 받고 싶", "코칭 받으려", "도움 받고 싶", "어떻게 시작",
+        "초1", "초2", "초3", "초4", "초5", "초6",
+        "중1", "중2", "중3", "고1", "고2", "고3",
+        "신입생", "새내기",
+    ],
     # 비전 명료성 부재
     "vision_unclear": ["모르겠", "막막", "방향", "비전이 없", "비전 모르"],
     # 큰 결정·막힘
     "stuck_decision": ["결단", "결정", "고민", "막혔", "갈림길", "선택"],
-    # 영역별 진입
-    "career": ["진로", "전공", "학교", "직업", "취업", "이직", "창업"],
-    "finance": ["재정", "돈", "투자", "집", "대출", "빚"],
+    # 영역별 진입 (한국 진로 어휘·학점제·수능·유학·병역 추가)
+    "career": [
+        "진로", "전공", "학교", "직업", "취업", "이직", "창업",
+        "고교학점제", "학점제", "과목 선택", "과목선택", "선택 과목",
+        "수능", "정시", "수시", "내신",
+        "대학 진학", "대학원", "유학", "교환학생", "어학연수",
+        "졸업 후", "졸업후", "졸업하면",
+        "병역", "군대", "군 복무", "복무",
+    ],
+    "finance": ["재정", "돈", "투자", "집", "대출", "빚", "학자금", "등록금", "유학 비용", "유학비용"],
     "relationship": ["결혼", "배우자", "가족", "관계", "이혼"],
     "ministry": ["사역", "선교", "교회", "신학", "전임", "안수"],
-    "future_simulation": ["5년", "10년", "미래", "시뮬레이션"],
+    "future_simulation": ["5년", "10년", "15년", "20년", "미래", "시뮬레이션", "장기", "멀리 봐"],
     # 비전 점검·메타 검증
     "vision_check": ["점검", "검증", "비전 진단", "비전 확인"],
     # 박사님 본인
@@ -1251,16 +1272,50 @@ def route_intake(first_utterance: Any) -> dict:
                     matched.append(cat)
                 break
 
-    # 카테고리 우선순위 — 가장 강한 신호부터
-    # 박사님 책 흐름: 첫 입장이면 *진단부터* (vision-cys-competence).
-    # *명시된 영역*이 stuck_decision보다 우선 — "진로 결정"이면 stuck보다 career 라우팅이 더 정확.
+    # --- CASCADE 1: track_user_state로 1차 사용자 자동 검출 (박사님 SKILL.md § 1 Mode D 6단계) ---
+    # 1차 사용자(visit_count==0 또는 has_diagnosis==False)는 발화 내용과 무관하게
+    # *박사님 책 공식 입학 진단*부터 시작해야 한다 (decide_first_skill 사양).
+    # 단 doctor_self·vision_check 신호는 명시적이므로 cascade 건너뜀.
+    explicit_override = any(c in matched for c in ("doctor_self", "vision_check"))
+    if not explicit_override:
+        try:
+            state_resp = track_user_state(action="read")
+            state = state_resp.get("state", {}) if isinstance(state_resp, dict) else {}
+            visit_count = int(state.get("visit_count", 0) or 0)
+            has_diagnosis = bool(state.get("has_diagnosis", False))
+            if visit_count == 0 or not has_diagnosis:
+                first_decision = decide_first_skill(state={
+                    "visit_count": visit_count,
+                    "has_diagnosis": has_diagnosis,
+                    "has_vision_statement": bool(state.get("has_vision_statement", False)),
+                    "stage": state.get("stage", "sketch"),
+                })
+                if "first_visit" not in matched:
+                    matched.insert(0, "first_visit")
+                return _intake_result(
+                    mode="intake",
+                    next_skill=first_decision.get("first_skill", "vision-cys-competence-visioncoding"),
+                    matched=matched,
+                    text=text,
+                    note=(
+                        f"1차 사용자 자동 검출 (visit_count={visit_count}, has_diagnosis={has_diagnosis}). "
+                        + first_decision.get("reason", "박사님 책 공식 입학 진단부터 시작.")
+                        + " 발화 매칭 카테고리는 진단 완료 후 2차 회차에서 활용."
+                    ),
+                )
+        except Exception:
+            # state 파일 없거나 손상 시 정적 priority 로직으로 fallback (서비스 연속성 보장)
+            pass
+
+    # --- priority cascade (반복 사용자 또는 explicit override) ---
+    # first_visit이 stuck_decision보다 위 — 명시적 "처음" 발화가 있으면 진단부터.
     priority = [
         "doctor_self",         # 박사님 본인 → A 모드 (가장 강한 신호)
         "vision_check",        # 메타 검증 → B 모드
+        "first_visit",         # 처음 → vision-cys-competence-visioncoding (박사님 책 공식 입학 진단)
         "career", "finance", "relationship", "ministry",  # 영역 명시 → 해당 전문 스킬
         "future_simulation",   # 미래 → C 모드
         "stuck_decision",      # 영역 모호한 큰 결정 → C 모드 grill + LDR
-        "first_visit",         # 처음 → vision-cys-competence-visioncoding (박사님 책 공식 입학 진단)
         "vision_unclear",      # 비전 모호 (자기인식 일부) → vision-clarity-coaching
     ]
     primary = next((c for c in priority if c in matched), None)
@@ -1591,19 +1646,60 @@ def validate_topic_map_skills(skills_root: Any = None) -> dict:
 HONORIFIC_DEFAULT = "선생님"
 
 
+_STUDENT_TITLE_TOKENS = (
+    "초1", "초2", "초3", "초4", "초5", "초6",
+    "중1", "중2", "중3",
+    "고1", "고2", "고3",
+    "초등", "중학", "고등", "재수", "재학",
+)
+
+
+def _is_minor_student(meta: dict) -> tuple[bool, str]:
+    """G6 #5: 미성년·학생 신분 검출. (is_student, source) 반환.
+    - age < 19 → 학생 신분
+    - title에 학년·학교급 토큰 포함 → 학생 신분 (age 없어도 매칭)
+    """
+    age = meta.get("age")
+    if isinstance(age, (int, float)) and 0 < age < 19:
+        return True, "age<19"
+    title = (meta.get("title") or "") if isinstance(meta.get("title"), str) else ""
+    if title:
+        for token in _STUDENT_TITLE_TOKENS:
+            if token in title:
+                return True, f"title contains '{token}'"
+    return False, ""
+
+
 def select_honorific(meta: Any = None) -> dict:
     """사용자 메타데이터로 호칭 결정.
 
     meta 키:
       - is_doctor: bool       → 박사님 본인이면 "박사님"
-      - title: str            → 명시 직함 ("목사", "전도사", "교수" 등) → "○○님"
-      - name: str             → 이름만 있을 때 "○○님"
+      - age: int              → age<19 + name 있으면 "○○ 학생" (G6 #5)
+      - gender: str           → "M"/"F" (학생 호칭 보강 — 군/양)
+      - title: str            → 명시 직함 ("목사", "전도사", "교수", "고1" 등)
+      - name: str             → 이름
       - default: 기본값 "선생님"
+
+    G6 #5: 미성년·학생 분기 추가.
+    - age<19 또는 title에 학년/학교급 토큰 있으면 학생 호칭 분기
+    - name 있으면 "○○ 학생" (자연스러운 한국어 호칭)
+    - name 없으면 "학생"
+    - "고1 학생님" 같이 학년+신분에 "님" 붙는 어색한 패턴 차단
     """
     if not isinstance(meta, dict):
         return {"honorific": HONORIFIC_DEFAULT, "reason": "no meta"}
     if meta.get("is_doctor") is True:
         return {"honorific": "박사님", "reason": "is_doctor=True"}
+
+    # G6 #5: 미성년·학생 분기 (가장 우선)
+    is_student, src = _is_minor_student(meta)
+    if is_student:
+        name = (meta.get("name") or "").strip() if isinstance(meta.get("name"), str) else ""
+        if name:
+            return {"honorific": f"{name} 학생", "reason": f"minor student ({src}) + name"}
+        return {"honorific": "학생", "reason": f"minor student ({src}), no name"}
+
     title = (meta.get("title") or "").strip() if isinstance(meta.get("title"), str) else ""
     if title:
         if title.endswith("님"):

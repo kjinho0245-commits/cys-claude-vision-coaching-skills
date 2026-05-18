@@ -413,9 +413,10 @@ def _emit(result: ValidationResult) -> int:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2:
-        print(__doc__)
-        return 2
+    # G10 #35: --help/-h/help 분기
+    if len(argv) < 2 or argv[1] in {"-h", "--help", "help"}:
+        print(__doc__ or "")
+        return 0 if len(argv) >= 2 else 2
 
     cmd = argv[1]
 

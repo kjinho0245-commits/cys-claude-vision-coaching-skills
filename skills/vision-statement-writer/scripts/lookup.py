@@ -328,9 +328,10 @@ DISPATCH = {
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print(__doc__, file=sys.stderr)
-        return 2
+    # G10 #33: --help/-h/help 분기
+    if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help", "help"}:
+        print(__doc__ or "")
+        return 0 if len(sys.argv) >= 2 else 2
     cmd = sys.argv[1]
     arg = sys.argv[2] if len(sys.argv) > 2 else None
     try:

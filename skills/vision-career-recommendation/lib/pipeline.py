@@ -37,6 +37,8 @@ def build_plan(profile: UserProfile) -> Dict:
     edu_norm = normalize_education(profile.education) if profile.education else None
     age_cat = get_age_category(profile.age) if profile.age is not None else None
 
+    # G7 #20: 다중지능·에니어그램 cross-match weighting을 select_top5에 전달
+    mi_top = profile.multiple_intel[:3] if profile.multiple_intel else None
     plan = {}
     for t in TYPE_KEYS:
         plan[t] = select_top5(
@@ -44,6 +46,8 @@ def build_plan(profile: UserProfile) -> Dict:
             age=profile.age,
             education=edu_norm,
             include_faith_jobs=profile.faith_disclosed,
+            mi_top=mi_top,
+            enneagram_type=profile.enneagram,
         )
 
     plan = resolve_duplicates(
@@ -78,13 +82,62 @@ def _summarize_input(profile: UserProfile) -> Dict:
     }
 
 
+CLI_HELP = """vision-career-recommendation 결정론 파이프라인
+
+UserProfile JSON을 입력받아 4유형 × 5슬롯 = 20개 직업 추천 plan을 산출.
+
+사용:
+  python3 scripts/run_pipeline.py <profile.json>     # 파일 입력
+  python3 scripts/run_pipeline.py -                  # stdin 입력
+  python3 scripts/run_pipeline.py --stdin            # stdin 입력 (동등)
+  cat profile.json | python3 scripts/run_pipeline.py # stdin 파이프
+  python3 scripts/run_pipeline.py --help             # 본 도움말
+
+UserProfile 스키마 (모두 선택, 빠지면 null/기본값):
+  age (int)              : 만 나이 — 최우선 필터
+  education (str)        : 중졸이하/고졸/전문대/대졸/석사/박사
+  mbti (str)             : 4글자 (예: INFJ)
+  enneagram (str)        : Type 1~9
+  riasec (str)           : 트라이코드 (예: IRS)
+  multiple_intel (list)  : 상위 3개 지능 이름
+  values (list)          : 가치 단어 5~10개
+  interests (list)       : 관심 분야 자유 기술
+  current_job (str)      : 진로 전환자에 필수
+  location (str)         : "한국"/"해외"
+  faith_disclosed (bool) : true면 Type 3 종교 봉사 직업 활성화
+  raw_input (str)        : 원본 사용자 텍스트 (언어 감지용)
+
+출력: {"plan": {...}, "meta": {...}} JSON.
+"""
+
+
 def cli_main(argv: List[str]) -> int:
-    """CLI entry: read JSON profile from stdin or first arg, print plan as JSON."""
+    """CLI entry: read JSON profile from stdin or first arg, print plan as JSON.
+
+    #16: argparse 도입 — --help·-h 지원·인자 의미 명시.
+    """
+    # 도움말 분기 (argparse 풀세팅 대신 경량 분기 — JSON 파이프 호환 우선)
+    if len(argv) > 1 and argv[1] in {"-h", "--help", "help"}:
+        sys.stdout.write(CLI_HELP)
+        return 0
+
     if len(argv) > 1 and argv[1] not in {"-", "--stdin"}:
-        with open(argv[1], "r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(argv[1], "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            sys.stderr.write(f"ERROR: File not found: {argv[1]}\n")
+            sys.stderr.write("Use --help for usage. Use '-' or '--stdin' to read from stdin.\n")
+            return 2
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"ERROR: Invalid JSON in {argv[1]}: {e}\n")
+            return 2
     else:
-        data = json.load(sys.stdin)
+        try:
+            data = json.load(sys.stdin)
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"ERROR: Invalid JSON from stdin: {e}\n")
+            return 2
 
     prof = UserProfile(
         age=data.get("age"),

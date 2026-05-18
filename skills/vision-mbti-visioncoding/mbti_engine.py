@@ -1071,8 +1071,9 @@ def cmd_selftest(_args):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
+    # G10 #32: --help/-h/help 표준 분기
+    if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help", "help"}:
+        print(__doc__ or "")
         print("\n사용법: mbti_engine.py <command> [args]")
         print("commands:")
         print("  questions [--axis=EI|SN|TF|JP]   20문항 카탈로그")
@@ -1082,7 +1083,7 @@ def main():
         print("  compare <T1> <T2>                 두 유형 비교")
         print("  analyze  (stdin JSON)             통합 분석 (모드 binary/scale/b1/b2)")
         print("  selftest                          자기 회귀 테스트")
-        sys.exit(1)
+        sys.exit(0 if len(sys.argv) >= 2 else 1)
     cmd = sys.argv[1]
     args = sys.argv[2:]
     table = {

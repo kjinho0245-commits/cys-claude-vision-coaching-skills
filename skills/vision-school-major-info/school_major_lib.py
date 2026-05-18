@@ -27,7 +27,7 @@ import stat
 import sys
 import time
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -368,19 +368,22 @@ def _require_kr_key() -> str | None:
     return v if isinstance(v, str) and v.strip() else None
 
 
-def _kr_career_call(svc_code: str, gubun: str | None, extra: dict | None = None, per_page: int = 10) -> dict:
+def _kr_career_call(svc_code: str, gubun: str | None, extra: dict | None = None, per_page: int = 10, this_page: int = 1) -> dict:
     """커리어넷 OpenAPI 단일 게이트웨이 호출 (캐시 통합).
-    gubun=None인 경우 파라미터에서 제외 (MAJOR_VIEW·JOB_VIEW·COSE처럼 gubun 없는 호출 지원)."""
+    gubun=None인 경우 파라미터에서 제외 (MAJOR_VIEW·JOB_VIEW·COSE처럼 gubun 없는 호출 지원).
+    #29: this_page 인자 추가 — 페이지별 순회 지원.
+    """
     key = _require_kr_key()
     if not key:
         return {"ok": False, "reason": "data_go_kr key not registered. Run check_api_keys."}
     per = max(1, min(int(per_page), 100))
+    this_p = max(1, int(this_page))
     params = {
         "apiKey": key,
         "svcType": "api",
         "svcCode": svc_code,
         "contentType": "json",
-        "thisPage": 1,
+        "thisPage": this_p,
         "perPage": per,
     }
     if gubun:
@@ -395,10 +398,18 @@ def _kr_career_call(svc_code: str, gubun: str | None, extra: dict | None = None,
         cached["from_cache"] = True
         return cached
     status, body = _http_get("https://www.career.go.kr/cnet/openapi/getOpenApi", params)
+    # G5: data 필드에 parsed JSON 보존 (raw[:5000]은 디버그용·후처리 필터는 data 사용)
+    parsed_data: Any = None
+    if body and status == 200:
+        try:
+            parsed_data = json.loads(body)
+        except (json.JSONDecodeError, ValueError):
+            parsed_data = None
     payload = {
         "ok": status == 200,
         "status": status,
         "raw": body[:5000] if body else "",
+        "data": parsed_data,
         "attribution": attribution_text(),
         "from_cache": False,
     }
@@ -448,14 +459,127 @@ def kr_search_university(name: Any = None, region: Any = None, per_page: int = 1
     )
 
 
+def _filter_kr_results_by_keyword(payload: dict, keyword: str | None, key_fields: list[str]) -> dict:
+    """G5 #11·#12: data.go.kr 커리어넷 API가 keyword 필터를 *무시*하고 전체 카탈로그 첫 페이지를
+    반환하는 동작을 결정론 후처리로 보정. raw JSON을 파싱해서 key_fields 중 하나에 keyword가
+    포함된 항목만 유지한다. keyword가 없거나 API 호출 실패 시 원본 그대로 반환.
+
+    원본 raw 문자열은 보존(투명성)·`filtered_content`·`filtered_count` 필드 추가.
+    """
+    if not keyword or not payload.get("ok"):
+        return payload
+    # data 필드 우선 사용 (parsed JSON·G5 보강), raw fallback
+    parsed = payload.get("data")
+    if parsed is None:
+        raw = payload.get("raw", "")
+        if not raw:
+            return payload
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            # raw가 5000자에서 잘렸을 수 있음 — 필터 불가
+            payload["filter_note"] = (
+                f"필터링 불가 — raw 응답이 truncated되어 JSON parse 실패. "
+                f"refresh_korean_data_cache로 캐시 갱신 후 재시도 권장."
+            )
+            return payload
+    # 커리어넷 응답 구조: {"dataSearch": {"content": [...]}}
+    if not isinstance(parsed, dict):
+        return payload
+    content = parsed.get("dataSearch", {}).get("content", [])
+    if not isinstance(content, list):
+        return payload
+    kw_norm = keyword.strip().lower()
+    filtered = []
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        for field in key_fields:
+            val = item.get(field, "")
+            if isinstance(val, str) and kw_norm in val.lower():
+                filtered.append(item)
+                break
+    payload["filtered_content"] = filtered
+    payload["filtered_count"] = len(filtered)
+    payload["filter_note"] = (
+        f"data.go.kr API의 keyword 필터 미지원 보정 — '{keyword}'로 후처리 필터링. "
+        f"matched_fields={key_fields}."
+    )
+    return payload
+
+
+def _multi_page_search(svc_code: str, gubun: str, key_param: str, keyword: str | None,
+                       key_fields: list[str], per_page: int = 100, max_pages: int = 6) -> dict:
+    """#29: 여러 페이지를 순회하면서 keyword 필터링 결과를 통합.
+    커리어넷 API가 keyword 파라미터를 *무시*하고 카탈로그 전체 페이지를 반환하므로,
+    여러 페이지를 가져와서 결정론 후처리 필터로 매칭. max_pages=6 (600건) 기본.
+    keyword 없으면 첫 페이지만 가져옴 (호출 비용 절약).
+    """
+    if not keyword:
+        return _kr_career_call(svc_code, gubun, {key_param: keyword}, per_page=10, this_page=1)
+
+    # 페이지 순회·통합
+    merged_content: list = []
+    last_payload: dict | None = None
+    total_seen = 0
+    pages_fetched = 0
+    for page in range(1, max_pages + 1):
+        payload = _kr_career_call(svc_code, gubun, {key_param: keyword}, per_page=per_page, this_page=page)
+        if not payload.get("ok"):
+            return payload  # 첫 실패 시 즉시 반환
+        last_payload = payload
+        pages_fetched += 1
+        parsed = payload.get("data")
+        if not isinstance(parsed, dict):
+            break
+        content = parsed.get("dataSearch", {}).get("content", [])
+        if not isinstance(content, list) or not content:
+            break  # 빈 페이지면 종료
+        merged_content.extend(content)
+        total_seen = len(merged_content)
+        # totalCount 확인 — 첫 항목에서 totalCount 추출
+        if content and isinstance(content[0], dict):
+            try:
+                total_count = int(content[0].get("totalCount", 0))
+                if total_seen >= total_count:
+                    break  # 전체 다 가져옴
+            except (ValueError, TypeError):
+                pass
+
+    # 통합 payload — keyword 필터링 적용
+    if last_payload is None:
+        return {"ok": False, "reason": "no payload"}
+    merged_payload = dict(last_payload)
+    merged_payload["data"] = {"dataSearch": {"content": merged_content}}
+    merged_payload["pages_fetched"] = pages_fetched
+    merged_payload["total_items_seen"] = total_seen
+    return _filter_kr_results_by_keyword(merged_payload, keyword, key_fields)
+
+
 def kr_search_major(keyword: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 학과정보 검색 (15057878)."""
-    return _kr_career_call("MAJOR", "univ_list", {"searchMajorName": keyword}, per_page)
+    """커리어넷 학과정보 검색 (15057878).
+    G5 #11 + #29: keyword 있으면 6 페이지(600건) 순회 후 결정론 필터. keyword 없으면 단일 페이지.
+    """
+    if not keyword:
+        return _kr_career_call("MAJOR", "univ_list", {"searchMajorName": keyword}, per_page)
+    return _multi_page_search(
+        svc_code="MAJOR", gubun="univ_list", key_param="searchMajorName",
+        keyword=str(keyword), key_fields=["mClass", "facilName"],
+        per_page=100, max_pages=6,
+    )
 
 
 def kr_career_search(keyword: Any = None, per_page: int = 10) -> dict:
-    """커리어넷 직업정보 검색 (15056641)."""
-    return _kr_career_call("JOB", "job_dic_list", {"searchJobNm": keyword}, per_page)
+    """커리어넷 직업정보 검색 (15056641).
+    G5 #12 + #29: keyword 있으면 6 페이지 순회 후 결정론 필터.
+    """
+    if not keyword:
+        return _kr_career_call("JOB", "job_dic_list", {"searchJobNm": keyword}, per_page)
+    return _multi_page_search(
+        svc_code="JOB", gubun="job_dic_list", key_param="searchJobNm",
+        keyword=str(keyword), key_fields=["jobNm", "jobNmKo", "summary", "name"],
+        per_page=100, max_pages=6,
+    )
 
 
 def kr_major_detail(major_seq: Any = None, keyword: Any = None) -> dict:
@@ -641,7 +765,9 @@ def _onet_get(path: str, timeout: float = 20.0) -> tuple[int, Any]:
 def onet_search_occupation(keyword: Any) -> dict:
     if not isinstance(keyword, str) or not keyword.strip():
         return {"ok": False, "reason": "keyword required"}
-    status, data = _onet_get(f"online/search?keyword={keyword.strip()}")
+    # G1 #14: 공백·특수문자 URL 인코딩 — "Computer Science"·"Industrial Engineering" 등
+    # 공백 포함 keyword가 InvalidURL 오류로 차단되던 버그 픽스.
+    status, data = _onet_get(f"online/search?keyword={quote(keyword.strip())}")
     return {
         "ok": status == 200,
         "status": status,
@@ -693,19 +819,74 @@ HOLLAND_KO_LABELS = {
 
 
 def holland_to_onet(code: Any) -> dict:
-    """Holland 6 영역 코드 → ONET 직업 검색 결과 매핑."""
-    if not isinstance(code, str) or code.strip().upper() not in HOLLAND_ONET_KEYWORDS:
-        return {"ok": False, "reason": f"code must be one of R/I/A/S/E/C, got {code!r}"}
+    """Holland 6 영역 코드 → ONET 직업 검색 결과 매핑.
+
+    G5 #13: 단일 문자(R/I/A/S/E/C)와 트라이코드(예: "ICR", "RIA") 모두 지원.
+    트라이코드는 박사님 vision-strong-visioncoding 결과 표준 출력. 3개 문자 모두 분해하여
+    각 영역의 키워드를 *가중치 부여 union*으로 반환 (Holland 1997 표준: 1순위 > 2순위 > 3순위).
+    """
+    if not isinstance(code, str) or not code.strip():
+        return {"ok": False, "reason": "code required (single char R/I/A/S/E/C or tricode like ICR)"}
     c = code.strip().upper()
-    keywords = HOLLAND_ONET_KEYWORDS[c]
+
+    # 단일 문자 — 기존 동작 보존 (하위 호환)
+    if len(c) == 1:
+        if c not in HOLLAND_ONET_KEYWORDS:
+            return {"ok": False, "reason": f"single-letter code must be one of R/I/A/S/E/C, got {code!r}"}
+        keywords = HOLLAND_ONET_KEYWORDS[c]
+        return {
+            "ok": True,
+            "mode": "single",
+            "holland_code": c,
+            "holland_label_ko": HOLLAND_KO_LABELS[c],
+            "search_keywords": keywords,
+            "note": "각 키워드를 onet_search_occupation에 넣어 직업 후보를 받을 수 있음.",
+            "attribution": onet_attribution_text(),
+            "source": "Holland 1997 + ONET Interest Profiler",
+        }
+
+    # 트라이코드 (2~3자) — 분해 + 가중치 union
+    if len(c) > 3:
+        return {"ok": False, "reason": f"code length must be 1-3, got {len(c)} ({code!r})"}
+    invalid = [ch for ch in c if ch not in HOLLAND_ONET_KEYWORDS]
+    if invalid:
+        return {"ok": False, "reason": f"invalid Holland letter(s): {invalid}. allowed: R/I/A/S/E/C"}
+    if len(set(c)) != len(c):
+        return {"ok": False, "reason": f"tricode chars must be distinct (no repeats): {code!r}"}
+
+    # 가중치 부여 — 1순위 weight=3, 2순위 weight=2, 3순위 weight=1
+    weighted: dict[str, float] = {}
+    components = []
+    for i, ch in enumerate(c):
+        weight = len(c) - i  # 3,2,1 또는 2,1
+        keywords = HOLLAND_ONET_KEYWORDS[ch]
+        components.append({
+            "rank": i + 1,
+            "code": ch,
+            "label_ko": HOLLAND_KO_LABELS[ch],
+            "weight": weight,
+            "keywords": keywords,
+        })
+        for kw in keywords:
+            weighted[kw] = weighted.get(kw, 0) + weight
+
+    # 가중치 내림차순 정렬한 통합 키워드 리스트
+    merged_keywords = sorted(weighted.items(), key=lambda x: (-x[1], x[0]))
     return {
         "ok": True,
-        "holland_code": c,
-        "holland_label_ko": HOLLAND_KO_LABELS[c],
-        "search_keywords": keywords,
-        "note": "각 키워드를 onet_search_occupation에 넣어 직업 후보를 받을 수 있음.",
+        "mode": "tricode",
+        "tricode": c,
+        "tricode_label_ko": " > ".join(HOLLAND_KO_LABELS[ch] for ch in c),
+        "components": components,
+        "merged_keywords": [{"keyword": kw, "weight": w} for kw, w in merged_keywords],
+        "top_keywords": [kw for kw, _ in merged_keywords[:10]],
+        "note": (
+            "트라이코드 분해 + 가중치 union. 1순위 weight=3·2순위=2·3순위=1. "
+            "top_keywords를 onet_search_occupation에 순차 호출. "
+            "박사님 vision-strong-visioncoding RIASEC 트라이코드 표준과 정합."
+        ),
         "attribution": onet_attribution_text(),
-        "source": "Holland 1997 + ONET Interest Profiler",
+        "source": "Holland 1997 (Making Vocational Choices, 3rd ed.) + ONET Interest Profiler",
     }
 
 

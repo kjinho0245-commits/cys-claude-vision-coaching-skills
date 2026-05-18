@@ -235,7 +235,10 @@ def classify_bands_batch(scores: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
 # 에니어그램 주 유형·날개 결정
 # ────────────────────────────────────────────────────────────────────
 
-def enneagram_wing(scores: Dict[str, Any]) -> Dict[str, Any]:
+ENNEAGRAM_MIN_AGE_RELIABLE = 14  # #28: 학계 표준 — 14세 미만은 측정 신뢰성 낮음
+
+
+def enneagram_wing(scores: Dict[str, Any], age: Any = None) -> Dict[str, Any]:
     """에니어그램 9유형 점수 → 주 유형·날개 결정.
 
     규칙 (Riso-Hudson RHETI 표준):
@@ -243,6 +246,10 @@ def enneagram_wing(scores: Dict[str, Any]) -> Dict[str, Any]:
     2. 동점이면 더 낮은 번호 우선 (결정론적 tie-break)
     3. 주 유형의 두 인접 유형 점수 중 더 높은 쪽이 날개
     4. 인접 동점이면 더 낮은 번호 우선
+
+    #28: age 인자 추가. age < 14면 confidence='low' + warning 첨부.
+    14세 미만 자아 정체성 미발달 시기는 학계·박사님 책상 측정 신뢰성 낮음.
+    산출은 *수행*하되 사용자·후속 스킬에 *확정적 유형*으로 전달하지 않도록 신호.
     """
     if not isinstance(scores, dict):
         raise ValueError("enneagram scores: dict 필요")
@@ -263,7 +270,7 @@ def enneagram_wing(scores: Dict[str, Any]) -> Dict[str, Any]:
         key=lambda t: (-validated[t], int(t))
     )
     wing = wing_candidates[0]
-    return {
+    result = {
         "main": main,
         "main_name": ENN_NAMES[main],
         "main_score": validated[main],
@@ -271,8 +278,19 @@ def enneagram_wing(scores: Dict[str, Any]) -> Dict[str, Any]:
         "wing_name": ENN_NAMES[wing],
         "wing_score": validated[wing],
         "notation": f"{main}w{wing}",
-        "all_scores": validated
+        "all_scores": validated,
+        "confidence": "standard",
     }
+    # #28: 14세 미만 가드
+    if isinstance(age, (int, float)) and 0 < age < ENNEAGRAM_MIN_AGE_RELIABLE:
+        result["confidence"] = "low"
+        result["age_caveat"] = (
+            f"측정 신뢰성 낮음 (age={int(age)} < {ENNEAGRAM_MIN_AGE_RELIABLE}). "
+            f"에니어그램은 학계·Riso-Hudson 표준상 자아 정체성이 자리잡는 14세 이상에서 "
+            f"안정적 측정. 본 결과는 *참고용*이며 *확정 유형*으로 후속 스킬·진로 결정에 "
+            f"전달하지 마십시오. 박사님 책 권고: 청소년 후반부(고등학생 이상) 재측정."
+        )
+    return result
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -602,7 +620,18 @@ def full_diagnose(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     if not isinstance(payload, dict):
         raise ValueError("full_diagnose: dict 필요")
-    report = {"user_label": payload.get("user_label", "사용자")}
+    # G4 #9: 페르소나 컨텍스트 보존 — user_label 외에 age·grade·gender·location·meta 전체 보존
+    report = {
+        "user_label": payload.get("user_label", "사용자"),
+        "persona": {
+            "age": payload.get("age"),
+            "grade": payload.get("grade"),
+            "gender": payload.get("gender"),
+            "location": payload.get("location"),
+            "education_stage": payload.get("education_stage"),
+            "raw_meta": payload.get("meta", {}),
+        },
+    }
 
     # 영역 A
     if "area_a" in payload:
@@ -620,7 +649,8 @@ def full_diagnose(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     # 영역 C 에니어그램
     if "enneagram" in payload:
-        report["enneagram"] = enneagram_wing(payload["enneagram"])
+        # #28: age 전달로 14세 미만 confidence 가드
+        report["enneagram"] = enneagram_wing(payload["enneagram"], age=payload.get("age"))
 
     # 영역 D 4 Skill Balance
     if "skill_balance" in payload:
@@ -667,6 +697,88 @@ def full_diagnose(payload: Dict[str, Any]) -> Dict[str, Any]:
         }
         report["leadership_style"] = leadership_map.get(main, "미분류")
 
+    # G4 #10: 박사님 책 사양 결정론 해석 가이드 (점수→밴드·강점→권고 직업군)
+    # 자연어 해석은 LLM이 담당하되, 점수 분류·직업군 매핑은 결정론 enum으로 export.
+    interpretation: Dict[str, Any] = {}
+    if "multiple_intelligence" in report:
+        mi_top = report["multiple_intelligence"]["ranking"][:3]
+        # 박사님 책 사양: 상위 2~3 지능 조합으로 비전 방향성 추정
+        # 출처: 최윤식 『미래준비학교』(2016) — 다중지능 강점 조합 진로 매핑
+        MI_CAREER_MAP = {
+            "논리수학지능": ["연구자", "엔지니어", "데이터 분석가", "수학자", "통계학자", "경제학자"],
+            "언어지능": ["작가", "교수", "기자", "변호사", "번역가", "편집자"],
+            "공간지능": ["건축가", "디자이너", "조종사", "외과의", "조각가", "예술가"],
+            "음악지능": ["음악가", "작곡가", "음악 교사", "음향 엔지니어"],
+            "신체운동지능": ["운동선수", "무용가", "외과의", "기능공", "물리치료사"],
+            "인간친화지능": ["교사", "상담가", "정치인", "마케터", "심리치료사", "성직자"],
+            "자기성찰지능": ["철학자", "신학자", "심리학자", "작가", "성직자"],
+            "자연친화지능": ["생물학자", "환경학자", "농학자", "수의사", "지질학자"],
+            "실존지능": ["철학자", "신학자", "윤리학자", "성직자"],
+        }
+        suggested_careers: list[str] = []
+        for entry in mi_top:
+            name = entry["intelligence"]
+            for career in MI_CAREER_MAP.get(name, []):
+                if career not in suggested_careers:
+                    suggested_careers.append(career)
+        interpretation["mi_career_suggestions"] = suggested_careers[:12]
+        interpretation["mi_top_combo"] = " + ".join(e["intelligence"] for e in mi_top)
+    if "enneagram" in report:
+        # 박사님 책 5w6 등 날개 표기 → 진로 적합도 해석 결정론화
+        notation = report["enneagram"].get("notation", "")
+        interpretation["enneagram_notation"] = notation
+    if "skill_balance" in report:
+        sb_top = report["skill_balance"]["ranking"][:2]
+        growth_areas = [r["area"] for r in report["skill_balance"]["ranking"] if r["score"] < 50]
+        interpretation["skill_balance_strengths"] = [r["area"] for r in sb_top]
+        interpretation["skill_balance_growth"] = growth_areas
+    if interpretation:
+        report["interpretation_deterministic"] = interpretation
+        report["interpretation_note"] = (
+            "결정론 매핑은 박사님 『미래준비학교』(2016) 다중지능 표준 진로 매핑 + "
+            "에니어그램 9유형 리더십 매핑. 세부 자연어 해석은 LLM이 담당하되, "
+            "직업군·강점·성장영역 라벨은 본 결정론 출력에서 직접 사용."
+        )
+
+    # G4 #8: 후속 vision 스킬 cross-orchestration 권고 매핑 — 진단 결과를 받아 다음 스킬로 자동 이어짐
+    next_skills: list[Dict[str, Any]] = []
+    if "multiple_intelligence" in report:
+        next_skills.append({
+            "skill": "vision-mission-frame",
+            "rationale": "다중지능 + 에니어그램 결과로 비전·미션 프레임 구축 (영적 직관력·이성적 판단력 양축)",
+            "priority": "high",
+        })
+        next_skills.append({
+            "skill": "vision-three-realm-balance",
+            "rationale": "3영역(나·세상·가치) 균형 검사 — 진단 결과 성장 영역과 cross-check",
+            "priority": "high",
+        })
+    if "vision_direction" in report:
+        next_skills.append({
+            "skill": "vision-career-recommendation",
+            "rationale": f"비전 방향성({report.get('vision_direction')}) + 다중지능 강점으로 4유형 × 5직업 추천",
+            "priority": "high",
+        })
+        next_skills.append({
+            "skill": "vision-school-major-info",
+            "rationale": "한국 4년제 대학 + 전공 + ONET 직업 매핑 (다중지능 강점 기반)",
+            "priority": "medium",
+        })
+    # 페르소나 컨텍스트 기반 추가 권고
+    age = report.get("persona", {}).get("age")
+    if isinstance(age, (int, float)) and age <= 20:
+        next_skills.append({
+            "skill": "vision-futures-timeline-map",
+            "rationale": "청소년 대상 — 박사님 미래지도로 15년 시간축 구축 (입시·대학·진로 단계)",
+            "priority": "high",
+        })
+    next_skills.append({
+        "skill": "vision-statement-writer",
+        "rationale": "진단 + 미래지도 후 비전 선언문 작성",
+        "priority": "medium",
+    })
+    report["next_skills_recommended"] = next_skills
+
     return report
 
 
@@ -680,14 +792,25 @@ def _emit(obj: Any, code: int = 0):
 
 
 def _read_input(args) -> Any:
+    """G4 #7: 인라인 JSON 문자열 처리 견고화.
+    - args.input이 '{' 또는 '['로 시작하면 즉시 인라인 JSON으로 해석 (파일 시도 skip)
+    - 파일 시도 시 FileNotFoundError + OSError(File name too long) 모두 catch
+    - stdin/'-'/None은 표준 입력
+    """
     if args.input == "-" or args.input is None:
         raw = sys.stdin.read()
     else:
-        try:
-            with open(args.input, "r", encoding="utf-8") as f:
-                raw = f.read()
-        except FileNotFoundError:
-            raw = args.input  # 파일이 아니면 인라인 JSON 문자열로 해석
+        s = args.input.lstrip()
+        if s.startswith("{") or s.startswith("["):
+            # 인라인 JSON 휴리스틱 — 파일 시도 skip (긴 JSON 시 OSError 회피)
+            raw = args.input
+        else:
+            try:
+                with open(args.input, "r", encoding="utf-8") as f:
+                    raw = f.read()
+            except (FileNotFoundError, IsADirectoryError, OSError):
+                # OSError: "File name too long" 등 — 인라인 JSON으로 fallback
+                raw = args.input
     raw = raw.strip()
     if not raw:
         return {}
